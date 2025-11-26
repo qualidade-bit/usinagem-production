@@ -20,8 +20,17 @@
 
   <!-- CSS externo -->
   <link rel="stylesheet" href="style.css" />
+  <script>
+/* ==========================================================
+   NOTIFICAÇÕES — PERMISSÃO GERAL
+   ========================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+});
+</script>
 </head>
-
 <body class="bg-gray-900 text-gray-100">
 <header class="p-4 border-b border-gray-800">
   <h1 class="text-xl font-bold">Diário de produção — Usinagem Dia (v18.6)</h1>
@@ -103,3 +112,4 @@
 
 </body>
 </html>
+
