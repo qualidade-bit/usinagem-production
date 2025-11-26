@@ -21,7 +21,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
+// ==========================================================
+// FUNÇÃO PARA ENVIAR NOTIFICAÇÕES WEB
+// ==========================================================
+function notificar(titulo, mensagem) {
+  if (!("Notification" in window)) return;
 
+  if (Notification.permission === "granted") {
+    new Notification(titulo, {
+      body: mensagem,
+      icon: "https://cdn-icons-png.flaticon.com/512/1827/1827272.png" // um ícone bonitinho
+    });
+  }
+}
 // =========================================================
 //  FUNÇÕES DE TEMPO E CÁLCULO DE PRODUÇÃO
 // =========================================================
@@ -395,6 +407,7 @@ function render() {
 
      salvarFirebase();
      atualizarGrafico();
+    notificar("Dashboard Atualizado!", `Máquina ${m.id} teve novos dados salvos.`);
    });
 
    addHistBtn.addEventListener('click', () => {
@@ -431,7 +444,8 @@ function render() {
      m.history.push(entry);
      renderHistory();
      salvarFirebase();
-   });
+    notificar("Histórico atualizado!", `Novo registro adicionado na máquina ${m.id}.`);
+ });
 
    clearHistBtn.addEventListener('click', () => {
      if (!confirm(`Limpar histórico de ${m.id}?`)) return;
@@ -575,4 +589,5 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
