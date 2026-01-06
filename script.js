@@ -234,18 +234,24 @@ function render() {
 }
 
 // =============================
-// FIREBASE LISTENER
+// FIREBASE LISTENER CORRIGIDO
 // =============================
 
 REF.on('value', snap => {
   const data = snap.val();
   state.machines = MACHINE_NAMES.map(id => {
     const raw = data && data[id];
-    return raw ? { ...maquinaPadrao(id), ...raw } : maquinaPadrao(id);
+
+    // Garante que raw seja um objeto antes de espalhar
+    if (raw && raw.constructor === Object) {
+      return { ...maquinaPadrao(id), ...raw };
+    } else {
+      return maquinaPadrao(id);
+    }
   });
+
   render();
 });
-
 // =============================
 // CSV
 // =============================
@@ -264,3 +270,4 @@ function exportCSV() {
 }
 
 document.getElementById('exportAll').addEventListener('click', exportCSV);
+
