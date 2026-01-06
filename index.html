@@ -4,75 +4,78 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard Usinagem</title>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script src="path/to/your/javascript.js"></script> <!-- insira aqui o JS que enviei -->
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-900 text-white p-4">
+<body class="bg-gray-900 text-white">
 
-<div class="flex justify-between mb-4">
-  <button id="exportAll" class="bg-green-600 px-4 py-2 rounded">Exportar CSV</button>
-  <button id="resetAll" class="bg-red-600 px-4 py-2 rounded">Resetar Tudo</button>
+<div class="p-4 flex gap-2 mb-4">
+  <button id="exportAll" class="bg-blue-600 px-3 py-1 rounded">Exportar CSV</button>
+  <button id="resetAll" class="bg-red-600 px-3 py-1 rounded">Resetar Tudo</button>
 </div>
 
-<div id="machinesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-  <!-- Os cards serão renderizados aqui pelo JS -->
-</div>
+<div id="machinesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
-<!-- TEMPLATE DE UM CARD -->
+<!-- Template do card -->
 <template id="machine-template">
-  <div class="bg-gray-800 rounded p-4 shadow-lg">
-    <h2 class="text-lg font-bold mb-1" data-role="title"></h2>
-    <p class="text-sm text-gray-300 mb-2" data-role="subtitle"></p>
+  <div class="bg-gray-800 p-4 rounded shadow-lg flex flex-col gap-2">
+    <div class="flex justify-between items-center">
+      <h2 data-role="title" class="font-bold text-lg">Máquina</h2>
+      <span data-role="predicted" class="text-green-400 font-bold">0</span>
+    </div>
+    <div data-role="subtitle" class="text-sm text-gray-300 mb-2">Operador · Ciclo · Peça</div>
 
-    <div class="grid grid-cols-2 gap-2 mb-2">
-      <input data-role="operator" placeholder="Operador" class="p-1 rounded text-black">
-      <input data-role="process" placeholder="Processo" class="p-1 rounded text-black">
-      <input data-role="cycle" placeholder="Ciclo (min)" class="p-1 rounded text-black">
-      <input data-role="troca" placeholder="Troca (min)" class="p-1 rounded text-black">
-      <input data-role="setup" placeholder="Parada/Setup (min)" class="p-1 rounded text-black">
-      <input data-role="produced" placeholder="Produzido" class="p-1 rounded text-black">
-      <input data-role="startTime" placeholder="Início (HH:MM)" class="p-1 rounded text-black">
-      <input data-role="endTime" placeholder="Fim (HH:MM)" class="p-1 rounded text-black">
+    <div class="grid grid-cols-2 gap-2">
+      <input data-role="operator" type="text" placeholder="Operador" class="p-1 rounded text-black"/>
+      <input data-role="process" type="text" placeholder="Peça" class="p-1 rounded text-black"/>
+      <input data-role="cycle" type="text" placeholder="Ciclo (min)" class="p-1 rounded text-black"/>
+      <input data-role="troca" type="text" placeholder="Troca (min)" class="p-1 rounded text-black"/>
+      <input data-role="setup" type="text" placeholder="Parada/Setup (min)" class="p-1 rounded text-black"/>
+      <input data-role="produced" type="number" placeholder="Produzido" class="p-1 rounded text-black"/>
     </div>
 
-    <input data-role="observacao" placeholder="Observação" class="p-1 rounded mb-2 w-full text-black">
+    <input data-role="observacao" type="text" placeholder="Observações" class="p-1 rounded text-black"/>
 
-    <div class="flex gap-2 mb-2">
-      <button data-role="save" class="bg-blue-600 px-2 py-1 rounded flex-1">Salvar</button>
-      <button data-role="addHistory" class="bg-yellow-600 px-2 py-1 rounded flex-1">Adicionar Histórico</button>
-      <button data-role="clearHistory" class="bg-red-600 px-2 py-1 rounded flex-1">Limpar Histórico</button>
+    <div class="grid grid-cols-2 gap-2">
+      <input data-role="startTime" type="time" class="p-1 rounded text-black"/>
+      <input data-role="endTime" type="time" class="p-1 rounded text-black"/>
     </div>
 
-    <div class="mb-2">
-      <canvas data-role="chart" class="w-full h-32"></canvas>
-      <p data-role="performance" class="text-center mt-1"></p>
+    <div class="flex gap-2 mt-2 flex-wrap">
+      <button data-role="save" class="bg-green-600 px-2 py-1 rounded text-sm">Salvar</button>
+      <button data-role="addHistory" class="bg-yellow-600 px-2 py-1 rounded text-sm">Adicionar Histórico</button>
+      <button data-role="clearHistory" class="bg-red-600 px-2 py-1 rounded text-sm">Limpar Histórico</button>
     </div>
 
-    <div class="mb-2">
-      <h3 class="font-bold mb-1">Histórico</h3>
-      <div data-role="history" class="max-h-40 overflow-y-auto text-xs"></div>
+    <canvas data-role="chart" class="mt-2 h-32"></canvas>
+    <div data-role="performance" class="text-center text-sm font-semibold mt-1">Desempenho: 0%</div>
+
+    <div class="mt-2">
+      <div class="text-sm font-bold mb-1">Histórico</div>
+      <div data-role="history" class="max-h-40 overflow-y-auto p-1 bg-gray-700 rounded"></div>
     </div>
 
-    <div class="mb-2">
-      <h3 class="font-bold mb-1">Processos Futuros</h3>
+    <div class="mt-2">
+      <div class="text-sm font-bold mb-1">Processos Futuros</div>
       <div class="flex gap-1 mb-1">
-        <input data-role="futureInput" placeholder="Novo processo" class="p-1 rounded text-black flex-1">
+        <input data-role="futureInput" type="text" placeholder="Nome processo" class="p-1 rounded text-black flex-1"/>
         <select data-role="prioritySelect" class="p-1 rounded text-black">
           <option value="vermelho">🔴 Urgente</option>
           <option value="amarelo">🟡 Alta</option>
           <option value="verde">🟢 Normal</option>
         </select>
-        <button data-role="addFuture" class="bg-blue-500 px-2 py-1 rounded">Adicionar</button>
+        <button data-role="addFuture" class="bg-green-600 px-2 py-1 rounded text-sm">Adicionar</button>
       </div>
-      <div data-role="futureList" class="max-h-32 overflow-y-auto"></div>
-      <button data-role="sortFuture" class="mt-1 bg-gray-600 px-2 py-1 rounded w-full">Ordenar por prioridade</button>
+      <button data-role="sortFuture" class="bg-blue-600 px-2 py-1 rounded text-sm mb-1">Ordenar Prioridade</button>
+      <div data-role="futureList" class="max-h-32 overflow-y-auto p-1 bg-gray-700 rounded"></div>
     </div>
   </div>
 </template>
+
+<script src="util.js"></script> <!-- seu JS corrigido aqui -->
 
 </body>
 </html>
