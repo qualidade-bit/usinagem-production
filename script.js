@@ -1,3 +1,9 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}
 // =============================
 //  CONFIGURAÇÕES INICIAIS
 // =============================
@@ -8,18 +14,30 @@ const MACHINE_NAMES = [
  '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450', 'Torno Convencional'
 ];
 
+// =============================
+// INICIALIZAÇÃO DO FIREBASE
+// =============================
 const firebaseConfig = {
- apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
+  apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
   authDomain: "dashboardusinagem.firebaseapp.com",
   projectId: "dashboardusinagem",
   storageBucket: "dashboardusinagem.firebasestorage.app",
   messagingSenderId: "677023128312",
-  appId: "1:677023128312:web:75376363a62105f360f90d"
+  appId: "1:677023128312:web:75376363a62105f360f90d",
+  databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com" // importante para Realtime DB
 };
 
+// Inicializa o Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const REF = db.ref('usinagem_dashboard_v18_6');
+
+// =============================
+// FUNÇÃO DE TESTE PARA VERIFICAR SE FUNCIONA
+// =============================
+db.ref("teste").set({ ok: true })
+  .then(() => console.log("Firebase conectado e funcionando!"))
+  .catch(err => console.error("Erro Firebase:", err));
+
 // ==========================================================
 // FUNÇÃO PARA ENVIAR NOTIFICAÇÕES WEB
 // ==========================================================
@@ -588,6 +606,7 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
 
 
