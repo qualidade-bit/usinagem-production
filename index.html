@@ -4,80 +4,65 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Usinagem</title>
+  <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
-<body class="bg-gray-900 text-white p-4">
-  <header class="mb-4 flex justify-between items-center">
-    <h1 class="text-2xl font-bold">Dashboard Usinagem</h1>
-    <div class="flex gap-2">
-      <button id="exportAll" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Exportar CSV</button>
-      <button id="resetAll" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Resetar Tudo</button>
-    </div>
-  </header>
+<body>
+  <div style="display:flex; gap: 10px; margin-bottom: 15px;">
+    <button id="exportAll">Exportar CSV</button>
+    <button id="resetAll">Resetar Tudo</button>
+  </div>
 
-  <main id="machinesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    <!-- Cards serão injetados pelo JS -->
-  </main>
+  <div id="machinesContainer">
+    <!-- Os cards serão renderizados pelo JS -->
+  </div>
 
   <!-- Template do Card -->
   <template id="machine-template">
-    <div class="bg-gray-800 rounded-lg p-4 shadow-lg">
-      <div class="flex justify-between items-center mb-2">
-        <h2 data-role="title" class="font-bold text-lg"></h2>
-        <span data-role="predicted" class="text-green-400 font-semibold">0</span>
-      </div>
-      <div data-role="subtitle" class="text-gray-400 text-sm mb-2"></div>
+    <div class="machine-card">
+      <h3 data-role="title">Máquina</h3>
+      <h4 data-role="subtitle">Operador · Ciclo · Peça</h4>
 
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <input data-role="operator" placeholder="Operador" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="process" placeholder="Peça" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="cycle" placeholder="Ciclo (min)" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="troca" placeholder="Troca (min)" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="setup" placeholder="Parada (min)" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="observacao" placeholder="Observação" class="bg-gray-700 text-white rounded px-2 py-1" />
-      </div>
+      <input type="text" placeholder="Operador" data-role="operator">
+      <input type="text" placeholder="Processo" data-role="process">
+      <input type="text" placeholder="Ciclo (min)" data-role="cycle">
+      <input type="text" placeholder="Troca (min)" data-role="troca">
+      <input type="text" placeholder="Setup (min)" data-role="setup">
+      <input type="text" placeholder="Produzido" data-role="produced">
+      <input type="text" placeholder="Início" data-role="startTime">
+      <input type="text" placeholder="Fim" data-role="endTime">
+      <input type="text" placeholder="Observação" data-role="observacao">
 
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <input data-role="startTime" type="time" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="endTime" type="time" class="bg-gray-700 text-white rounded px-2 py-1" />
-        <input data-role="produced" type="number" placeholder="Realizado" class="bg-gray-700 text-white rounded px-2 py-1" />
+      <div style="display:flex; gap:5px; margin-top:5px;">
+        <button data-role="save">Salvar</button>
+        <button data-role="addHistory">Adicionar no Histórico</button>
+        <button data-role="clearHistory">Limpar Histórico</button>
       </div>
 
-      <canvas data-role="chart" class="mb-2"></canvas>
-      <div data-role="performance" class="text-center text-sm font-semibold mt-1 text-gray-400"></div>
+      <canvas data-role="chart" width="300" height="120"></canvas>
+      <div class="performance" data-role="performance">Desempenho: -</div>
 
-      <div class="flex gap-2 mt-2">
-        <button data-role="save" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded flex-1">Salvar</button>
-        <button data-role="addHistory" class="bg-yellow-600 hover:bg-yellow-700 px-3 py-1 rounded flex-1">Adicionar no Histórico</button>
-        <button data-role="clearHistory" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded flex-1">Limpar Histórico</button>
-      </div>
+      <h4>Histórico</h4>
+      <div data-role="history"></div>
 
-      <div class="mt-2">
-        <h3 class="font-semibold mb-1">Histórico</h3>
-        <div data-role="history" class="bg-gray-700 rounded p-2 max-h-32 overflow-y-auto text-xs"></div>
+      <h4>Lista de Espera / Processos Futuros</h4>
+      <div style="display:flex; gap:5px; margin-bottom:5px;">
+        <input type="text" placeholder="Nome do processo futuro" data-role="futureInput">
+        <select data-role="prioritySelect">
+          <option value="vermelho">🔴 Urgente</option>
+          <option value="amarelo">🟡 Alta</option>
+          <option value="verde">🟢 Normal</option>
+        </select>
+        <button data-role="addFuture">Adicionar</button>
+        <button data-role="sortFuture">Ordenar</button>
       </div>
-
-      <div class="mt-2">
-        <h3 class="font-semibold mb-1">Processos Futuros</h3>
-        <div class="flex gap-2 mb-2">
-          <input data-role="futureInput" placeholder="Nome do processo" class="bg-gray-700 text-white rounded px-2 py-1 flex-1" />
-          <select data-role="prioritySelect" class="bg-gray-700 text-white rounded px-2 py-1">
-            <option value="vermelho">🔴 Urgente</option>
-            <option value="amarelo">🟡 Alta</option>
-            <option value="verde">🟢 Normal</option>
-          </select>
-          <button data-role="addFuture" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded">Adicionar</button>
-        </div>
-        <div data-role="futureList" class="bg-gray-700 rounded p-2 max-h-32 overflow-y-auto text-xs"></div>
-        <button data-role="sortFuture" class="mt-1 bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded w-full">Ordenar por Prioridade</button>
-      </div>
+      <div data-role="futureList" class="future-list"></div>
     </div>
   </template>
 
-  <script src="script.js"></script>
+  <script src="javascript.js"></script>
 </body>
 </html>
