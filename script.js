@@ -1,9 +1,3 @@
-{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}
 // =============================
 //  CONFIGURAÇÕES INICIAIS
 // =============================
@@ -605,6 +599,7 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
 
 
