@@ -20,12 +20,12 @@ const firebaseConfig = {
   databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com"
 };
 
+// Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const REF = db.ref('/');
+const REF = firebase.database().ref();
 
 // =============================
-// FUNÇÕES AUXILIARES
+// FUNÇÕES DE TEMPO E CÁLCULO
 // =============================
 function parseTempoMinutos(str) {
   if (!str) return 0;
@@ -49,38 +49,33 @@ function formatMinutesToMMSS(minFloat) {
 
 function minutosDisponiveis(startStr, endStr) {
   if (!startStr || !endStr) return 0;
-  function toMinutes(timeStr){
+  function toMinutes(timeStr) {
     const parts = timeStr.split(':').map(Number);
-    if(parts.length===3) return parts[0]*60 + parts[1] + parts[2]/60;
-    if(parts.length===2) return parts[0]*60 + parts[1];
-    if(parts.length===1) return parts[0]*60;
+    if (parts.length===3) return parts[0]*60 + parts[1] + parts[2]/60;
+    if (parts.length===2) return parts[0]*60 + parts[1];
+    if (parts.length===1) return parts[0]*60;
     return 0;
   }
   const start = toMinutes(startStr);
   const end = toMinutes(endStr);
-  let diff = end - start;
-  if(diff < 0) return 0;
+  let diff = end-start;
+  if(diff<0) return 0;
 
   const lunchStart = toMinutes('12:00');
   const lunchEnd = toMinutes('13:00');
   if(end>lunchStart && start<lunchEnd){
     const overlap = Math.min(end,lunchEnd)-Math.max(start,lunchStart);
-    if(overlap>0) diff -= overlap;
+    if(overlap>0) diff-=overlap;
   }
   return Math.max(diff,0);
 }
 
 function calcularPrevisto(cycleMin, trocaMin, setupMin, startStr, endStr){
-  const totalDisponivel = Math.max(minutosDisponiveis(startStr,endStr) - (setupMin||0),0);
+  const totalDisponivel = Math.max(minutosDisponiveis(startStr,endStr)-(setupMin||0),0);
   if(!cycleMin || cycleMin<=0 || totalDisponivel<=0) return 0;
   const cicloTotal = cycleMin + (trocaMin||0);
-  if(cicloTotal <= 0) return 0;
+  if(cicloTotal<=0) return 0;
   return Math.floor(totalDisponivel / cicloTotal);
-}
-
-function ensureFutureArray(machine){
-  if(!machine) return;
-  if(!Array.isArray(machine.future)) machine.future = [];
 }
 
 // =============================
@@ -90,7 +85,7 @@ let state = { machines: [] };
 
 function initDefaultMachines(){
   return MACHINE_NAMES.map(name=>({
-    id: name,
+    id:name,
     operator:'',
     process:'',
     cycleMin:null,
@@ -106,22 +101,31 @@ function initDefaultMachines(){
   }));
 }
 
+function ensureFutureArray(machine){
+  if(!machine) return;
+  if(!Array.isArray(machine.future)) machine.future=[];
+}
+
 // =============================
-// FUNÇÃO DE RENDERIZAÇÃO
+// FUNÇÃO DE RENDER
 // =============================
 function render(){
   const container = document.getElementById('machinesContainer');
-  container.innerHTML='';
+  if(!container) return console.error("Container #machinesContainer não encontrado");
+  container.innerHTML = '';
 
   state.machines.forEach(m=>{
     ensureFutureArray(m);
+
     const tpl = document.getElementById('machine-template');
+    if(!tpl) return console.error("Template não encontrado!");
     const node = tpl.content.cloneNode(true);
     const root = node.querySelector('div');
+    if(!root) return console.error("Elemento root no template não encontrado");
 
+    // Elementos do card
     const title = node.querySelector('[data-role="title"]');
     const subtitle = node.querySelector('[data-role="subtitle"]');
-
     const operatorInput = node.querySelector('[data-role="operator"]');
     const processInput = node.querySelector('[data-role="process"]');
     const cycleInput = node.querySelector('[data-role="cycle"]');
@@ -131,21 +135,19 @@ function render(){
     const startInput = node.querySelector('[data-role="startTime"]');
     const endInput = node.querySelector('[data-role="endTime"]');
     const producedInput = node.querySelector('[data-role="produced"]');
-
     const saveBtn = node.querySelector('[data-role="save"]');
     const addHistBtn = node.querySelector('[data-role="addHistory"]');
     const clearHistBtn = node.querySelector('[data-role="clearHistory"]');
-
     const predictedEl = node.querySelector('[data-role="predicted"]');
     const historyEl = node.querySelector('[data-role="history"]');
     const performanceEl = node.querySelector('[data-role="performance"]');
-
     const futureInput = node.querySelector('[data-role="futureInput"]');
     const addFutureBtn = node.querySelector('[data-role="addFuture"]');
     const futureList = node.querySelector('[data-role="futureList"]');
     const prioritySelect = node.querySelector('[data-role="prioritySelect"]');
     const sortFutureBtn = node.querySelector('[data-role="sortFuture"]');
 
+    // Preenche dados
     title.textContent = m.id;
     subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin!=null?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
     operatorInput.value = m.operator;
@@ -153,7 +155,7 @@ function render(){
     cycleInput.value = m.cycleMin!=null?formatMinutesToMMSS(m.cycleMin):'';
     trocaInput.value = m.trocaMin!=null?formatMinutesToMMSS(m.trocaMin):'';
     setupInput.value = m.setupMin!=null?formatMinutesToMMSS(m.setupMin):'';
-    observacaoInput.value = m.observacao || '';
+    observacaoInput.value = m.observacao||'';
     startInput.value = m.startTime;
     endInput.value = m.endTime;
     producedInput.value = m.produced!=null?m.produced:'';
@@ -161,34 +163,7 @@ function render(){
 
     container.appendChild(root);
 
-    // -------------------------------
-    // FUNÇÕES CARD ESPECÍFICAS
-    // -------------------------------
-    function atualizarGrafico(){
-      const predicted = m.predicted || 0;
-      const produced = (m.produced!=null && m.produced!=='') ? Number(m.produced) : 0;
-      const ratio = (predicted>0) ? (produced/predicted)*100 : 0;
-      let color='rgba(255,255,255,0.3)', txtColor='text-gray-400';
-      if(ratio<50){color='rgba(255,0,0,0.6)'; txtColor='text-red-500';}
-      else if(ratio<80){color='rgba(255,255,0,0.6)'; txtColor='text-yellow-400';}
-      else{color='rgba(0,255,0,0.6)'; txtColor='text-green-400';}
-      const ctx = root.querySelector('[data-role="chart"]').getContext('2d');
-      const chart = new Chart(ctx,{
-        type:'bar',
-        data:{
-          labels:['Previsto','Realizado'],
-          datasets:[{
-            label:m.id,
-            data:[predicted, produced],
-            backgroundColor:['rgba(0,200,0,0.4)',color]
-          }]
-        },
-        options:{scales:{y:{beginAtZero:true}},plugins:{legend:{display:false}}}
-      });
-      performanceEl.className=`text-center text-sm font-semibold mt-1 ${txtColor}`;
-      performanceEl.textContent=`Desempenho: ${ratio.toFixed(1)}%`;
-    }
-
+    // Funções de histórico e futuro
     function renderHistory(){
       historyEl.innerHTML='';
       if(!m.history || m.history.length===0){
@@ -196,9 +171,9 @@ function render(){
         return;
       }
       m.history.slice().reverse().forEach(h=>{
-        const div=document.createElement('div');
+        const div = document.createElement('div');
         div.className='mb-1 border-b border-gray-800 pb-1';
-        const ts=new Date(h.ts).toLocaleString();
+        const ts = new Date(h.ts).toLocaleString();
         div.innerHTML=`
           <div class="text-xs text-gray-300">${ts}</div>
           <div class="text-sm">Operador: <strong>${h.operator}</strong> · Peça: <strong>${h.process}</strong></div>
@@ -219,12 +194,10 @@ function render(){
       m.future.forEach((f,i)=>{
         const div=document.createElement('div');
         div.className=`rounded px-2 py-1 flex justify-between items-center cursor-move prioridade-${f.priority}`;
-        const badge=document.createElement('div');
-        badge.className='wait-badge';
-        if(f.priority==='vermelho'){badge.style.backgroundColor='#dc2626'; badge.style.color='#000';}
-        else if(f.priority==='amarelo'){badge.style.backgroundColor='#eab308'; badge.style.color='#000';}
-        else{badge.style.backgroundColor='#16a34a'; badge.style.color='#000';}
-        badge.textContent=String(i+1);
+        div.style.backgroundColor=f.priority==='vermelho'?'#dc2626':f.priority==='amarelo'?'#eab308':'#16a34a';
+        div.style.color='#000';
+        div.style.marginBottom='4px';
+
         const left=document.createElement('div');
         left.className='flex items-center gap-2 flex-1';
         const input=document.createElement('input');
@@ -232,38 +205,48 @@ function render(){
         input.className='bg-transparent flex-1 mr-2 outline-none text-black font-bold';
         input.addEventListener('input',()=>{f.name=input.value;});
         input.addEventListener('blur',()=>{REF.child(m.id).set(m);});
+        left.appendChild(input);
+
         const select=document.createElement('select');
-        select.className='bg-gray-200 text-black text-sm rounded px-1 font-bold';
         [['vermelho','🔴 Urgente'],['amarelo','🟡 Alta'],['verde','🟢 Normal']].forEach(([p,label])=>{
           const opt=document.createElement('option'); opt.value=p; opt.textContent=label;
-          if(p===f.priority) opt.selected=true; select.appendChild(opt);
+          if(p===f.priority) opt.selected=true;
+          select.appendChild(opt);
         });
-        select.addEventListener('change',()=>{f.priority=select.value; REF.child(m.id).set(m); renderFuture();});
-        const delBtn=document.createElement('button'); delBtn.className='ml-2 text-black font-bold'; delBtn.textContent='✖';
-        delBtn.addEventListener('click',()=>{m.future.splice(i,1); REF.child(m.id).set(m); renderFuture();});
-        left.appendChild(badge); left.appendChild(input);
+        select.addEventListener('change',()=>{
+          f.priority=select.value;
+          REF.child(m.id).set(m);
+          renderFuture();
+        });
+
+        const delBtn=document.createElement('button');
+        delBtn.textContent='✖';
+        delBtn.className='ml-2 text-black font-bold';
+        delBtn.addEventListener('click',()=>{
+          m.future.splice(i,1);
+          REF.child(m.id).set(m);
+          renderFuture();
+        });
+
         div.appendChild(left); div.appendChild(select); div.appendChild(delBtn);
         futureList.appendChild(div);
       });
-      Sortable.create(futureList,{animation:150,onEnd:function(evt){const item=m.future.splice(evt.oldIndex,1)[0]; m.future.splice(evt.newIndex,0,item); REF.child(m.id).set(m); renderFuture();}});
     }
 
-    // -------------------------------
-    // EVENTOS DOS BOTÕES
-    // -------------------------------
+    // Botões
     saveBtn.addEventListener('click',()=>{
       const cycleVal=parseTempoMinutos(cycleInput.value.trim());
       const setupVal=parseTempoMinutos(setupInput.value.trim());
       const trocaVal=parseTempoMinutos(trocaInput.value.trim());
       const startVal=startInput.value||'07:00';
       const endVal=endInput.value||'16:45';
-      const producedVal = producedInput.value.trim()===''?null:Number(producedInput.value.trim());
+      const producedVal=producedInput.value.trim()===''?null:Number(producedInput.value.trim());
       const pred=calcularPrevisto(cycleVal,trocaVal,setupVal,startVal,endVal);
       m.operator=operatorInput.value.trim();
       m.process=processInput.value.trim();
-      m.cycleMin=(cycleInput.value.trim()==='')?null:cycleVal;
+      m.cycleMin=cycleInput.value.trim()===''?null:cycleVal;
       m.setupMin=setupVal||0;
-      m.trocaMin=(trocaInput.value.trim()==='')?null:trocaVal;
+      m.trocaMin=trocaInput.value.trim()===''?null:trocaVal;
       m.observacao=observacaoInput.value;
       m.startTime=startVal;
       m.endTime=endVal;
@@ -272,7 +255,6 @@ function render(){
       predictedEl.textContent=pred;
       subtitle.textContent=`Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin!=null?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
       REF.child(m.id).set(m);
-      atualizarGrafico();
     });
 
     addHistBtn.addEventListener('click',()=>{
@@ -281,16 +263,20 @@ function render(){
       const trocaVal=parseTempoMinutos(trocaInput.value.trim());
       const startVal=startInput.value||'07:00';
       const endVal=endInput.value||'16:45';
-      const producedVal = producedInput.value.trim()===''?null:Number(producedInput.value.trim());
+      const producedVal=producedInput.value.trim()===''?null:Number(producedInput.value.trim());
       const predicted=calcularPrevisto(cycleVal,trocaVal,setupVal,startVal,endVal);
       const efficiency=(predicted>0 && producedVal!=null)?((producedVal/predicted)*100).toFixed(1):'-';
       const entry={ts:Date.now(),operator:operatorInput.value.trim()||'-',process:processInput.value.trim()||'-',cycleMin:cycleVal,setupMin:setupVal,trocaMin:trocaVal,startTime:startVal,endTime:endVal,produced:producedVal,predicted,efficiency,observacao:observacaoInput.value};
-      m.history.push(entry); renderHistory(); REF.child(m.id).set(m);
+      m.history.push(entry);
+      renderHistory();
+      REF.child(m.id).set(m);
     });
 
     clearHistBtn.addEventListener('click',()=>{
       if(!confirm(`Limpar histórico de ${m.id}?`)) return;
-      m.history=[]; renderHistory(); REF.child(m.id).set(m);
+      m.history=[];
+      renderHistory();
+      REF.child(m.id).set(m);
     });
 
     addFutureBtn.addEventListener('click',()=>{
@@ -298,24 +284,22 @@ function render(){
       const prioridade=prioritySelect.value;
       if(!nome) return alert('Digite o nome do processo futuro.');
       ensureFutureArray(m);
-      m.future.push({name:nome,priority:prioridade});
+      m.future.push({name:nome,priority});
       futureInput.value='';
-      REF.child(m.id).set(m); renderFuture();
+      REF.child(m.id).set(m);
+      renderFuture();
     });
 
     sortFutureBtn.addEventListener('click',()=>{
       ensureFutureArray(m);
       const ordem={vermelho:1,amarelo:2,verde:3};
       m.future.sort((a,b)=>ordem[a.priority]-ordem[b.priority]);
-      REF.child(m.id).set(m); renderFuture();
+      REF.child(m.id).set(m);
+      renderFuture();
     });
 
-    // -------------------------------
-    // RENDERIZAÇÕES INICIAIS
-    // -------------------------------
     renderHistory();
     renderFuture();
-    atualizarGrafico();
   });
 }
 
@@ -349,5 +333,12 @@ REF.on('value', snapshot=>{
       };
     });
   }
+  render();
+});
+
+// =============================
+// INICIALIZAÇÃO AO CARREGAR
+// =============================
+document.addEventListener('DOMContentLoaded', ()=>{
   render();
 });
