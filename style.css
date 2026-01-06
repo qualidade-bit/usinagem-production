@@ -1,45 +1,103 @@
-canvas {
-  width: 100% !important;
-  height: 120px !important;
-}
+/* ============================= */
+/*  STYLE DO DASHBOARD USINAGEM  */
+/* ============================= */
 
-.prioridade-vermelho {
-  background-color: #dc2626 !important;
-  color: #000 !important;
-  font-weight: 700;
-}
-
-.prioridade-amarelo {
-  background-color: #eab308 !important;
-  color: #000 !important;
-  font-weight: 700;
-}
-
-.prioridade-verde {
-  background-color: #16a34a !important;
-  color: #000 !important;
-  font-weight: 700;
-}
-
+/* 🔹 Badges para processos futuros */
 .wait-badge {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
   justify-content: center;
-  font-weight: 800;
-  border: 2px solid rgba(0,0,0,0.8);
-  margin-right: 8px;
+  align-items: center;
 }
 
-input:focus, select:focus, [contenteditable]:focus {
+/* 🔹 Scroll customizado */
+.scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar::-webkit-scrollbar-track {
+  background: #1f2937; /* bg-gray-800 */
+  border-radius: 3px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+  background: #4b5563; /* bg-gray-600 */
+  border-radius: 3px;
+}
+
+/* 🔹 Cards e hover */
+.machine-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.machine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px rgba(0,0,0,0.5);
+}
+
+/* 🔹 Texto de eficiência */
+.efficiency-low { color: #dc2626; }      /* vermelho */
+.efficiency-mid { color: #facc15; }      /* amarelo */
+.efficiency-high { color: #22c55e; }     /* verde */
+
+/* 🔹 Botões */
+button {
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+/* 🔹 Inputs */
+input, select {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(56,189,248,0.2);
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  background-color: #374151; /* bg-gray-700 */
+  color: white;
+  font-size: 0.875rem; /* text-sm */
 }
 
-button.sort-btn {
-  padding: 6px 8px;
-  font-size: 0.85rem;
+/* 🔹 Gráfico */
+canvas {
+  background-color: #1f2937; /* bg-gray-800 */
+  border-radius: 0.5rem;
+}
+
+/* 🔹 Lista de históricos e futuros */
+.history-list, .future-list {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* 🔹 Subtitles e textos secundários */
+.subtitle {
+  color: #9ca3af; /* text-gray-400 */
+  font-size: 0.875rem; /* text-sm */
+}
+
+/* 🔹 Badge cores de prioridade */
+.prioridade-vermelho .wait-badge { background-color: #dc2626; color: #000; }
+.prioridade-amarelo .wait-badge { background-color: #eab308; color: #000; }
+.prioridade-verde .wait-badge { background-color: #16a34a; color: #000; }
+
+/* 🔹 Responsividade */
+@media (min-width: 768px) {
+  #machinesContainer {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  #machinesContainer {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
