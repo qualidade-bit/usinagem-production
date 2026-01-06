@@ -31,12 +31,10 @@ const REF = db.ref('usinagem_dashboard_v18_6');
 
 function notificar(titulo, mensagem) {
   if (!("Notification" in window)) return;
-
   if (Notification.permission === "default") {
     Notification.requestPermission();
     return;
   }
-
   if (Notification.permission === "granted") {
     new Notification(titulo, {
       body: mensagem,
@@ -46,56 +44,47 @@ function notificar(titulo, mensagem) {
 }
 
 // =============================
-// TEMPO E CÁLCULOS
+// TEMPO
 // =============================
 
 function parseTempoMinutos(str) {
   if (!str) return 0;
   const s = String(str).trim();
-
   if (s.includes(':')) {
     const [m, s2 = 0] = s.split(':').map(Number);
     return m + (s2 / 60);
   }
-
   const v = Number(s.replace(',', '.'));
   return isNaN(v) ? 0 : v;
 }
 
-function formatMinutesToMMSS(minFloat) {
-  if (!minFloat || isNaN(minFloat)) return '-';
-  const totalSeconds = Math.round(minFloat * 60);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+function formatMinutesToMMSS(min) {
+  if (!min || isNaN(min)) return '-';
+  const sec = Math.round(min * 60);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2,'0')}`;
 }
 
-function minutosDisponiveis(startStr, endStr) {
-  if (!startStr || !endStr) return 0;
-
+function minutosDisponiveis(inicio, fim) {
   const toMin = t => {
-    const [h, m] = t.split(':').map(Number);
+    const [h,m] = t.split(':').map(Number);
     return h * 60 + m;
   };
-
-  let diff = toMin(endStr) - toMin(startStr);
+  let diff = toMin(fim) - toMin(inicio);
   if (diff <= 0) return 0;
 
-  const lunchStart = toMin('12:00');
-  const lunchEnd = toMin('13:00');
-
-  if (toMin(endStr) > lunchStart && toMin(startStr) < lunchEnd) {
-    diff -= Math.min(toMin(endStr), lunchEnd) - Math.max(toMin(startStr), lunchStart);
+  const almIni = toMin('12:00');
+  const almFim = toMin('13:00');
+  if (toMin(fim) > almIni && toMin(inicio) < almFim) {
+    diff -= Math.min(toMin(fim), almFim) - Math.max(toMin(inicio), almIni);
   }
-
   return Math.max(diff, 0);
 }
 
-function calcularPrevisto(cycleMin, trocaMin, setupMin, startStr, endStr) {
-  const disponivel = Math.max(minutosDisponiveis(startStr, endStr) - (setupMin || 0), 0);
-  const cicloTotal = cycleMin + (trocaMin || 0);
-  if (cicloTotal <= 0 || disponivel <= 0) return 0;
-  return Math.floor(disponivel / cicloTotal);
+function calcularPrevisto(ciclo, troca, setup, ini, fim) {
+  const disp = Math.max(minutosDisponiveis(ini, fim) - (setup || 0), 0);
+  const total = ciclo + (troca || 0);
+  if (disp <= 0 || total <= 0) return 0;
+  return Math.floor(disp / total);
 }
 
 // =============================
@@ -104,26 +93,45 @@ function calcularPrevisto(cycleMin, trocaMin, setupMin, startStr, endStr) {
 
 let state = { machines: [] };
 
-function initDefaultMachines() {
-  return MACHINE_NAMES.map(id => ({
+function maquinaPadrao(id) {
+  return {
     id,
-    operator: '',
-    process: '',
-    cycleMin: null,
-    setupMin: 0,
-    trocaMin: null,
-    observacao: '',
-    startTime: '07:00',
-    endTime: '16:45',
-    produced: null,
-    predicted: 0,
-    history: [],
-    future: []
-  }));
+    operator:'',
+    process:'',
+    cycleMin:null,
+    setupMin:0,
+    trocaMin:null,
+    observacao:'',
+    startTime:'07:00',
+    endTime:'16:45',
+    produced:null,
+    predicted:0,
+    history:[],
+    future:[]
+  };
 }
 
-function ensureFutureArray(m) {
-  if (!Array.isArray(m.future)) m.future = [];
+// =============================
+// SALVAMENTO SEGURO (🔥 FIX)
+// =============================
+
+function salvarMaquina(m) {
+  const payload = {
+    id: m.id,
+    operator: m.operator || '',
+    process: m.process || '',
+    cycleMin: m.cycleMin ?? null,
+    setupMin: m.setupMin ?? 0,
+    trocaMin: m.trocaMin ?? null,
+    observacao: m.observacao || '',
+    startTime: m.startTime || '07:00',
+    endTime: m.endTime || '16:45',
+    produced: m.produced ?? null,
+    predicted: m.predicted ?? 0,
+    history: Array.isArray(m.history) ? m.history : [],
+    future: Array.isArray(m.future) ? m.future : []
+  };
+  return REF.child(m.id).set(payload);
 }
 
 // =============================
@@ -135,8 +143,6 @@ function render() {
   container.innerHTML = '';
 
   state.machines.forEach(m => {
-    ensureFutureArray(m);
-
     const tpl = document.getElementById('machine-template');
     const node = tpl.content.cloneNode(true);
     const root = node.querySelector('div');
@@ -148,23 +154,21 @@ function render() {
     const cycleInput = node.querySelector('[data-role="cycle"]');
     const trocaInput = node.querySelector('[data-role="troca"]');
     const setupInput = node.querySelector('[data-role="setup"]');
-    const observacaoInput = node.querySelector('[data-role="observacao"]');
     const startInput = node.querySelector('[data-role="startTime"]');
     const endInput = node.querySelector('[data-role="endTime"]');
     const producedInput = node.querySelector('[data-role="produced"]');
     const saveBtn = node.querySelector('[data-role="save"]');
     const predictedEl = node.querySelector('[data-role="predicted"]');
-    const performanceEl = node.querySelector('[data-role="performance"]');
+    const perfEl = node.querySelector('[data-role="performance"]');
 
     title.textContent = m.id;
-    subtitle.textContent = `Operador: ${m.operator || '-'} · Ciclo: ${m.cycleMin ? formatMinutesToMMSS(m.cycleMin) : '-'} · Peça: ${m.process || '-'}`;
+    subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
 
     operatorInput.value = m.operator;
     processInput.value = m.process;
     cycleInput.value = m.cycleMin ? formatMinutesToMMSS(m.cycleMin) : '';
     trocaInput.value = m.trocaMin ? formatMinutesToMMSS(m.trocaMin) : '';
     setupInput.value = m.setupMin ? formatMinutesToMMSS(m.setupMin) : '';
-    observacaoInput.value = m.observacao;
     startInput.value = m.startTime;
     endInput.value = m.endTime;
     producedInput.value = m.produced ?? '';
@@ -172,25 +176,22 @@ function render() {
 
     container.appendChild(root);
 
-    // =============================
-    // GRÁFICO
-    // =============================
-
+    // ===== CHART =====
     const ctx = root.querySelector('[data-role="chart"]').getContext('2d');
     if (m._chart) m._chart.destroy();
 
     m._chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Previsto', 'Realizado'],
-        datasets: [{
-          data: [m.predicted, m.produced || 0],
-          backgroundColor: ['rgba(0,200,0,0.4)','rgba(255,255,255,0.3)']
+      type:'bar',
+      data:{
+        labels:['Previsto','Realizado'],
+        datasets:[{
+          data:[m.predicted, m.produced || 0],
+          backgroundColor:['rgba(0,200,0,.4)','rgba(255,255,255,.3)']
         }]
       },
-      options: {
-        scales: { y: { beginAtZero: true } },
-        plugins: { legend: { display: false } }
+      options:{
+        plugins:{ legend:{ display:false }},
+        scales:{ y:{ beginAtZero:true }}
       }
     });
 
@@ -198,22 +199,18 @@ function render() {
       const prod = Number(m.produced);
       const ratio = (m.predicted > 0 && !isNaN(prod)) ? (prod / m.predicted) * 100 : 0;
 
-      let color = 'rgba(255,255,255,0.3)', txt = 'text-gray-400';
-      if (ratio < 50) { color = 'rgba(255,0,0,0.6)'; txt = 'text-red-500'; }
-      else if (ratio < 80) { color = 'rgba(255,255,0,0.6)'; txt = 'text-yellow-400'; }
-      else { color = 'rgba(0,255,0,0.6)'; txt = 'text-green-400'; }
+      let cor='rgba(255,255,255,.3)', txt='text-gray-400';
+      if (ratio < 50) { cor='rgba(255,0,0,.6)'; txt='text-red-500'; }
+      else if (ratio < 80) { cor='rgba(255,255,0,.6)'; txt='text-yellow-400'; }
+      else { cor='rgba(0,255,0,.6)'; txt='text-green-400'; }
 
-      m._chart.data.datasets[0].data = [m.predicted, prod || 0];
-      m._chart.data.datasets[0].backgroundColor = ['rgba(0,200,0,0.4)', color];
+      m._chart.data.datasets[0].data=[m.predicted, prod||0];
+      m._chart.data.datasets[0].backgroundColor=['rgba(0,200,0,.4)',cor];
       m._chart.update();
 
-      performanceEl.className = `text-center text-sm font-semibold mt-1 ${txt}`;
-      performanceEl.textContent = `Desempenho: ${ratio.toFixed(1)}%`;
+      perfEl.className=`text-center text-sm font-semibold mt-1 ${txt}`;
+      perfEl.textContent=`Desempenho: ${ratio.toFixed(1)}%`;
     }
-
-    // =============================
-    // SALVAR
-    // =============================
 
     saveBtn.addEventListener('click', () => {
       m.operator = operatorInput.value.trim();
@@ -223,14 +220,13 @@ function render() {
       m.setupMin = parseTempoMinutos(setupInput.value);
       m.startTime = startInput.value;
       m.endTime = endInput.value;
-      m.produced = producedInput.value === '' ? null : Number(producedInput.value);
-      m.predicted = calcularPrevisto(m.cycleMin, m.trocaMin, m.setupMin, m.startTime, m.endTime);
-      m.observacao = observacaoInput.value;
+      m.produced = producedInput.value===''?null:Number(producedInput.value);
+      m.predicted = calcularPrevisto(m.cycleMin,m.trocaMin,m.setupMin,m.startTime,m.endTime);
 
-      REF.child(m.id).update(m);
+      salvarMaquina(m);
       predictedEl.textContent = m.predicted;
       atualizarGrafico();
-      notificar('Dashboard Atualizado', `Máquina ${m.id} salva`);
+      notificar('Dashboard atualizado', `Máquina ${m.id} salva`);
     });
 
     atualizarGrafico();
@@ -243,29 +239,26 @@ function render() {
 
 REF.on('value', snap => {
   const data = snap.val();
-  if (!data) {
-    state.machines = initDefaultMachines();
-    state.machines.forEach(m => REF.child(m.id).set(m));
-  } else {
-    state.machines = MACHINE_NAMES.map(id => data[id] || initDefaultMachines().find(m => m.id === id));
-  }
+  state.machines = MACHINE_NAMES.map(id => {
+    const raw = data && data[id];
+    return raw ? { ...maquinaPadrao(id), ...raw } : maquinaPadrao(id);
+  });
   render();
 });
 
 // =============================
-// EXPORTAR CSV
+// CSV
 // =============================
 
 function exportCSV() {
-  const lines = ['Máquina,Operador,Processo,Previsto,Realizado'];
-  state.machines.forEach(m => {
-    lines.push(`"${m.id}","${m.operator}","${m.process}",${m.predicted},${m.produced ?? ''}`);
+  const linhas = ['Máquina,Operador,Processo,Previsto,Realizado'];
+  state.machines.forEach(m=>{
+    linhas.push(`"${m.id}","${m.operator}","${m.process}",${m.predicted},${m.produced??''}`);
   });
-
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'usinagem.csv';
+  const blob=new Blob([linhas.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='usinagem.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }
