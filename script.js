@@ -24,9 +24,8 @@ const firebaseConfig = {
   storageBucket: "dashboardusinagem.firebasestorage.app",
   messagingSenderId: "677023128312",
   appId: "1:677023128312:web:75376363a62105f360f90d",
-  databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com" // importante para Realtime DB
+  databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com"
 };
-
 // Inicializa o Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -606,6 +605,7 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
 
 
