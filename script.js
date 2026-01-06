@@ -9,13 +9,12 @@ const MACHINE_NAMES = [
 ];
 
 const firebaseConfig = {
- apiKey: "AIzaSyALyU3_v10EZzZMmN02RyXxpEficXRFtBY",
- authDomain: "usinagemdashboard.firebaseapp.com",
- databaseURL: "https://usinagemdashboard-default-rtdb.firebaseio.com",
- projectId: "usinagemdashboard",
- storageBucket: "usinagemdashboard.firebasestorage.app",
- messagingSenderId: "584772442861",
- appId: "1:5847720247ba0fe8468ae4"
+ apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
+  authDomain: "dashboardusinagem.firebaseapp.com",
+  projectId: "dashboardusinagem",
+  storageBucket: "dashboardusinagem.firebasestorage.app",
+  messagingSenderId: "677023128312",
+  appId: "1:677023128312:web:75376363a62105f360f90d"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -589,5 +588,6 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
 
