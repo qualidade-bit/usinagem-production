@@ -112,7 +112,7 @@ function maquinaPadrao(id) {
 }
 
 // =============================
-// SALVAMENTO SEGURO (🔥 FIX)
+// SALVAMENTO SEGURO
 // =============================
 
 function salvarMaquina(m) {
@@ -160,6 +160,7 @@ function render() {
     const saveBtn = node.querySelector('[data-role="save"]');
     const predictedEl = node.querySelector('[data-role="predicted"]');
     const perfEl = node.querySelector('[data-role="performance"]');
+    const historicoBtn = node.querySelector('[data-role="historico"]'); // botão histórico dentro do card
 
     title.textContent = m.id;
     subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
@@ -212,6 +213,7 @@ function render() {
       perfEl.textContent=`Desempenho: ${ratio.toFixed(1)}%`;
     }
 
+    // ===== EVENTOS =====
     saveBtn.addEventListener('click', () => {
       m.operator = operatorInput.value.trim();
       m.process = processInput.value.trim();
@@ -228,6 +230,22 @@ function render() {
       atualizarGrafico();
       notificar('Dashboard atualizado', `Máquina ${m.id} salva`);
     });
+
+    if (historicoBtn) {
+      historicoBtn.addEventListener('click', () => {
+        // Aqui você adiciona a função de adicionar ao histórico, mantendo a lógica original
+        if (!m.history) m.history = [];
+        m.history.push({
+          operador: m.operator,
+          processo: m.process,
+          ciclo: m.cycleMin,
+          produzidas: m.produced ?? 0,
+          timestamp: new Date().toISOString()
+        });
+        salvarMaquina(m);
+        notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
+      });
+    }
 
     atualizarGrafico();
   });
@@ -252,8 +270,9 @@ REF.on('value', snap => {
 
   render();
 });
+
 // =============================
-// CSV
+// CSV / BOTÕES FIXOS
 // =============================
 
 function exportCSV() {
@@ -269,5 +288,24 @@ function exportCSV() {
   URL.revokeObjectURL(a.href);
 }
 
-document.getElementById('exportAll').addEventListener('click', exportCSV);
+// Aplica eventos aos botões fixos
+document.addEventListener('DOMContentLoaded', () => {
+  const exportBtn = document.getElementById('exportAll');
+  if (exportBtn) exportBtn.addEventListener('click', exportCSV);
 
+  const histBtn = document.getElementById('addToHistorico');
+  if (histBtn) histBtn.addEventListener('click', () => {
+    state.machines.forEach(m=>{
+      if (!m.history) m.history = [];
+      m.history.push({
+        operador: m.operator,
+        processo: m.process,
+        ciclo: m.cycleMin,
+        produzidas: m.produced ?? 0,
+        timestamp: new Date().toISOString()
+      });
+      salvarMaquina(m);
+    });
+    notificar('Histórico atualizado', `Todos os registros adicionados ao histórico`);
+  });
+});
