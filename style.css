@@ -1,103 +1,159 @@
-/* ============================= */
-/*  STYLE DO DASHBOARD USINAGEM  */
-/* ============================= */
+/* ==============================
+   Estilo geral do container
+============================== */
+body {
+  background-color: #1f1f1f;
+  font-family: Arial, sans-serif;
+  color: #fff;
+  margin: 0;
+  padding: 20px;
+}
 
-/* 🔹 Badges para processos futuros */
-.wait-badge {
+#machinesContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: flex-start;
+}
+
+/* ==============================
+   Estilo dos cards
+============================== */
+.machine-card {
+  background-color: #2a2a2a;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+  padding: 15px;
+  width: 300px;
+  display: flex;
+  flex-direction: column; /* Campos um abaixo do outro */
+  gap: 10px;
+}
+
+.machine-card h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.machine-card h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #bbb;
+}
+
+/* ==============================
+   Inputs e selects
+============================== */
+.machine-card input,
+.machine-card select,
+.machine-card textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background-color: #555;
+  color: #fff;
+  font-weight: bold;
+  outline: none;
+}
+
+.machine-card input:focus,
+.machine-card select:focus,
+.machine-card textarea:focus {
+  box-shadow: 0 0 5px #00ffcc;
+}
+
+/* ==============================
+   Botões
+============================== */
+.machine-card button {
+  background-color: #444;
+  color: #fff;
+  font-weight: bold;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.machine-card button:hover {
+  background-color: #666;
+}
+
+/* ==============================
+   Gráfico e performance
+============================== */
+.machine-card canvas {
+  margin-top: 10px;
+  border-radius: 8px;
+}
+
+.performance {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* ==============================
+   Histórico
+============================== */
+.history-entry {
+  border-bottom: 1px solid #444;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #ccc;
+}
+
+/* ==============================
+   Lista de espera / Processos futuros
+============================== */
+.future-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.future-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #000;
+  font-weight: bold;
+  cursor: grab;
+}
+
+.future-item.vermelho {
+  background-color: #dc2626; /* Urgente */
+}
+
+.future-item.amarelo {
+  background-color: #eab308; /* Alta */
+}
+
+.future-item.verde {
+  background-color: #16a34a; /* Normal */
+}
+
+/* ==============================
+   Badge de prioridade
+============================== */
+.future-item .badge {
+  display: inline-block;
   width: 20px;
-  height: 20px;
-  border-radius: 50%;
+  text-align: center;
   font-size: 12px;
   font-weight: bold;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
-/* 🔹 Scroll customizado */
-.scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar::-webkit-scrollbar-track {
-  background: #1f2937; /* bg-gray-800 */
-  border-radius: 3px;
-}
-
-.scrollbar::-webkit-scrollbar-thumb {
-  background: #4b5563; /* bg-gray-600 */
-  border-radius: 3px;
-}
-
-/* 🔹 Cards e hover */
-.machine-card {
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.machine-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px rgba(0,0,0,0.5);
-}
-
-/* 🔹 Texto de eficiência */
-.efficiency-low { color: #dc2626; }      /* vermelho */
-.efficiency-mid { color: #facc15; }      /* amarelo */
-.efficiency-high { color: #22c55e; }     /* verde */
-
-/* 🔹 Botões */
-button {
-  cursor: pointer;
-  transition: background-color 0.2s, transform 0.2s;
-}
-
-button:hover {
-  transform: translateY(-1px);
-}
-
-/* 🔹 Inputs */
-input, select {
-  outline: none;
-  border: none;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.5rem;
-  background-color: #374151; /* bg-gray-700 */
-  color: white;
-  font-size: 0.875rem; /* text-sm */
-}
-
-/* 🔹 Gráfico */
-canvas {
-  background-color: #1f2937; /* bg-gray-800 */
-  border-radius: 0.5rem;
-}
-
-/* 🔹 Lista de históricos e futuros */
-.history-list, .future-list {
-  max-height: 120px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-/* 🔹 Subtitles e textos secundários */
-.subtitle {
-  color: #9ca3af; /* text-gray-400 */
-  font-size: 0.875rem; /* text-sm */
-}
-
-/* 🔹 Badge cores de prioridade */
-.prioridade-vermelho .wait-badge { background-color: #dc2626; color: #000; }
-.prioridade-amarelo .wait-badge { background-color: #eab308; color: #000; }
-.prioridade-verde .wait-badge { background-color: #16a34a; color: #000; }
-
-/* 🔹 Responsividade */
-@media (min-width: 768px) {
+/* ==============================
+   Responsividade
+============================== */
+@media (max-width: 1024px) {
   #machinesContainer {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  #machinesContainer {
-    grid-template-columns: repeat(3, 1fr);
+    justify-content: center;
   }
 }
