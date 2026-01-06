@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard - Usinagem Dia (versão 18.6)</title>
+  <title>Dashboard - Usinagem Dia (v18.6)</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,18 +20,18 @@
 
   <!-- CSS externo -->
   <link rel="stylesheet" href="style.css" />
+
   <script>
-/* ==========================================================
-   NOTIFICAÇÕES — PERMISSÃO GERAL
-   ========================================================== */
-document.addEventListener("DOMContentLoaded", () => {
-  if ("Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission();
-  }
-});
-</script>
+  // Notificações
+  document.addEventListener("DOMContentLoaded", () => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  });
+  </script>
 </head>
 <body class="bg-gray-900 text-gray-100">
+
 <header class="p-4 border-b border-gray-800">
   <h1 class="text-xl font-bold">Diário de produção — Usinagem Dia (v18.6)</h1>
   <div class="mt-2 flex gap-2">
@@ -112,4 +112,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
-
