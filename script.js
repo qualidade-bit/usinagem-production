@@ -298,18 +298,19 @@ function render() {
        const badge = document.createElement('div');
        badge.className = 'wait-badge';
 
-       if (f.priority === 'vermelho') {
-         badge.style.backgroundColor = '#dc2626'; 
-         badge.style.color = '#000';
-       } else if (f.priority === 'amarelo') {
-         badge.style.backgroundColor = '#eab308';
-         badge.style.color = '#000';
-       } else {
-         badge.style.backgroundColor = '#16a34a';
-         badge.style.color = '#000';
-       }
+     if (f.priority === 'vermelho') {
+  badge.style.backgroundColor = '#dc2626'; 
+  badge.style.color = '#000';
+} else if (f.priority === 'amarelo') {
+  badge.style.backgroundColor = '#eab308';
+  badge.style.color = '#000';
+} else {
+  badge.style.backgroundColor = '#16a34a';
+  badge.style.color = '#000';
+}
 
-       badge.textContent = String(i + 1);
+
+      badge.textContent = String(i + 1);
 
        // Área esquerda
        const left = document.createElement('div');
@@ -595,3 +596,4 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
