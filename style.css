@@ -4,7 +4,7 @@ canvas {
 }
 
 .prioridade-vermelho {
-  background-color: #472b2b !important;
+  background-color: #b91c1c !important;
   color: #d42c2c !important;
   font-weight: 700;
 }
@@ -43,3 +43,4 @@ button.sort-btn {
   padding: 6px 8px;
   font-size: 0.85rem;
 }
+
