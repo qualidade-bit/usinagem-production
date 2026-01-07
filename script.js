@@ -158,9 +158,10 @@ function render() {
     const endInput = node.querySelector('[data-role="endTime"]');
     const producedInput = node.querySelector('[data-role="produced"]');
     const saveBtn = node.querySelector('[data-role="save"]');
+    const addHistoryBtn = node.querySelector('[data-role="addHistory"]');
+    const clearHistoryBtn = node.querySelector('[data-role="clearHistory"]');
     const predictedEl = node.querySelector('[data-role="predicted"]');
     const perfEl = node.querySelector('[data-role="performance"]');
-    const historicoBtn = node.querySelector('[data-role="historico"]'); // botão histórico dentro do card
 
     title.textContent = m.id;
     subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
@@ -231,41 +232,42 @@ function render() {
       notificar('Dashboard atualizado', `Máquina ${m.id} salva`);
     });
 
-    if (historicoBtn) {
-      historicoBtn.addEventListener('click', () => {
-        // Aqui você adiciona a função de adicionar ao histórico, mantendo a lógica original
-        if (!m.history) m.history = [];
-        m.history.push({
-          operador: m.operator,
-          processo: m.process,
-          ciclo: m.cycleMin,
-          produzidas: m.produced ?? 0,
-          timestamp: new Date().toISOString()
-        });
-        salvarMaquina(m);
-        notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
+    // Adicionar ao histórico
+    addHistoryBtn.addEventListener('click', () => {
+      if (!m.history) m.history = [];
+      m.history.push({
+        operador: m.operator,
+        processo: m.process,
+        ciclo: m.cycleMin,
+        produzidas: m.produced ?? 0,
+        timestamp: new Date().toISOString()
       });
-    }
+      salvarMaquina(m);
+      notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
+    });
+
+    // Limpar histórico
+    clearHistoryBtn.addEventListener('click', () => {
+      m.history = [];
+      salvarMaquina(m);
+      notificar('Histórico limpo', `Máquina ${m.id} teve histórico limpo`);
+    });
 
     atualizarGrafico();
   });
 }
 
 // =============================
-// FIREBASE LISTENER CORRIGIDO
+// FIREBASE LISTENER
 // =============================
 
 REF.on('value', snap => {
   const data = snap.val();
   state.machines = MACHINE_NAMES.map(id => {
     const raw = data && data[id];
-
-    // Garante que raw seja um objeto antes de espalhar
-    if (raw && raw.constructor === Object) {
-      return { ...maquinaPadrao(id), ...raw };
-    } else {
-      return maquinaPadrao(id);
-    }
+    return raw && raw.constructor === Object
+      ? { ...maquinaPadrao(id), ...raw }
+      : maquinaPadrao(id);
   });
 
   render();
@@ -288,24 +290,17 @@ function exportCSV() {
   URL.revokeObjectURL(a.href);
 }
 
-// Aplica eventos aos botões fixos
 document.addEventListener('DOMContentLoaded', () => {
   const exportBtn = document.getElementById('exportAll');
   if (exportBtn) exportBtn.addEventListener('click', exportCSV);
 
-  const histBtn = document.getElementById('addToHistorico');
-  if (histBtn) histBtn.addEventListener('click', () => {
-    state.machines.forEach(m=>{
-      if (!m.history) m.history = [];
-      m.history.push({
-        operador: m.operator,
-        processo: m.process,
-        ciclo: m.cycleMin,
-        produzidas: m.produced ?? 0,
-        timestamp: new Date().toISOString()
-      });
+  const resetBtn = document.getElementById('resetAll');
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    if (!confirm('Deseja realmente resetar todas as máquinas?')) return;
+    state.machines.forEach(m => {
+      Object.assign(m, maquinaPadrao(m.id));
       salvarMaquina(m);
     });
-    notificar('Histórico atualizado', `Todos os registros adicionados ao histórico`);
+    notificar('Dashboard resetado', 'Todos os dados foram resetados');
   });
 });
