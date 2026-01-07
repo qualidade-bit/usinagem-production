@@ -1,5 +1,5 @@
 // =============================
-// ESTADO GLOBAL (NÃO REMOVER)
+// ESTADO GLOBAL
 // =============================
 window.state = window.state || { machines: [] };
 const state = window.state;
@@ -26,12 +26,11 @@ if (!firebase.apps.length) {
     appId: "1:677023128312:web:75376363a62105f360f90d"
   });
 }
-
 const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
 
 // =============================
-// FUNÇÕES ORIGINAIS (MANTIDAS)
+// FUNÇÕES DE TEMPO (ORIGINAIS)
 // =============================
 function parseTempoMinutos(str){
   if(!str) return 0;
@@ -64,6 +63,9 @@ function calcularPrevisto(ciclo,troca,setup,i,f){
   return Math.floor(disp/total);
 }
 
+// =============================
+// PADRÃO DE MÁQUINA
+// =============================
 function maquinaPadrao(id){
   return {
     id,
@@ -82,11 +84,7 @@ function maquinaPadrao(id){
 }
 
 function salvarMaquina(m){
-  return REF.child(m.id).set({
-    ...m,
-    history:m.history||[],
-    future:m.future||[]
-  });
+  return REF.child(m.id).set(m);
 }
 
 // =============================
@@ -102,7 +100,7 @@ function render(){
     const root=node.firstElementChild;
     const q=s=>root.querySelector(s);
 
-    // inputs
+    // INPUTS
     q('[data-role="operator"]').value=m.operator;
     q('[data-role="process"]').value=m.process;
     q('[data-role="cycle"]').value=m.cycleMin?formatMinutesToMMSS(m.cycleMin):'';
@@ -114,10 +112,10 @@ function render(){
     q('[data-role="predicted"]').textContent=m.predicted;
 
     // =============================
-    // GRÁFICO (COMPARATIVO REAL)
+    // GRÁFICO COMPARATIVO (RESTAURADO)
     // =============================
     const canvas=q('[data-role="chart"]');
-    let chart;
+    let chart=null;
 
     function atualizarGrafico(){
       if(!canvas) return;
@@ -174,20 +172,15 @@ function render(){
     };
 
     // =============================
-    // HISTÓRICO (ABAIXO DO GRÁFICO)
+    // HISTÓRICO (SEM ALTERAR)
     // =============================
-    const histBox=q('[data-role="history"]');
-
-    function renderHistory(){
-      histBox.innerHTML='';
-      m.history.slice().reverse().forEach(h=>{
-        const d=document.createElement('div');
-        d.textContent=`${h.timestamp.replace('T',' ').split('.')[0]} — ${h.operador} · ${h.processo} · ${h.produzidas}`;
-        histBox.appendChild(d);
-      });
-    }
-
-    renderHistory();
+    const hist=q('[data-role="history"]');
+    hist.innerHTML='';
+    m.history.slice().reverse().forEach(h=>{
+      const d=document.createElement('div');
+      d.textContent=`${h.timestamp.replace('T',' ').split('.')[0]} — ${h.operador} · ${h.processo} · ${h.produzidas}`;
+      hist.appendChild(d);
+    });
 
     q('[data-role="addHistory"]').onclick=()=>{
       m.history.push({
@@ -197,32 +190,36 @@ function render(){
         timestamp:new Date().toISOString()
       });
       salvarMaquina(m);
-      renderHistory();
+      render();
     };
 
     q('[data-role="clearHistory"]').onclick=()=>{
       if(!m.history.length) return;
       m.history=[];
       salvarMaquina(m);
-      renderHistory();
+      render();
     };
 
     // =============================
-    // LISTA DE ESPERA (POR PRIORIDADE)
+    // LISTA DE ESPERA COM COR
     // =============================
-    const prioridade={vermelho:3,amarelo:2,verde:1};
     const futureList=q('[data-role="futureList"]');
+    const priorityColor={
+      vermelho:'#7f1d1d',
+      amarelo:'#78350f',
+      verde:'#14532d'
+    };
 
     function renderFuture(){
       futureList.innerHTML='';
-      m.future
-        .slice()
-        .sort((a,b)=>prioridade[b.priority]-prioridade[a.priority])
-        .forEach(f=>{
-          const d=document.createElement('div');
-          d.textContent=f.item;
-          futureList.appendChild(d);
-        });
+      m.future.forEach(f=>{
+        const d=document.createElement('div');
+        d.textContent=f.item;
+        d.style.backgroundColor=priorityColor[f.priority];
+        d.style.padding='4px 6px';
+        d.style.borderRadius='4px';
+        futureList.appendChild(d);
+      });
     }
 
     renderFuture();
