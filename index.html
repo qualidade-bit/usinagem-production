@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Dashboard - Usinagem Dia (versão 18.6)</title>
+  <title>Dashboard - Usinagem Dia (v18.6)</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,16 +18,23 @@
   <!-- Sortable -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
+  <!-- Google API Client (SEM async/defer) -->
+  <script src="https://apis.google.com/js/api.js"></script>
+
   <!-- CSS externo -->
   <link rel="stylesheet" href="style.css" />
-  <script> 
-    <!-- Google API Client -->
-<script async defer src="https://apis.google.com/js/api.js"></script>
 
-</script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    });
+  </script>
 </head>
 
 <body class="bg-gray-900 text-gray-100">
+
 <header class="p-4 border-b border-gray-800">
   <h1 class="text-xl font-bold">Diário de produção — Usinagem Dia (v18.6)</h1>
   <div class="mt-2 flex gap-2">
@@ -43,7 +50,7 @@
 </main>
 
 <footer class="p-4 text-xs text-gray-500 border-t border-gray-800">
-  Versão v18.6 — Agora com lista de espera editável e reordenável por prioridade ou arrasto manual.
+  Versão v18.6 — Lista de espera editável e reordenável.
 </footer>
 
 <!-- Template -->
@@ -83,7 +90,6 @@
       <div data-role="performance" class="text-center text-sm font-semibold mt-1"></div>
       <div class="max-h-40 overflow-auto bg-gray-900/30 p-2 rounded text-sm" data-role="history"></div>
 
-      <!-- Lista de espera -->
       <div class="mt-4">
         <h3 class="font-semibold text-sm mb-1">🕒 Processos Futuros</h3>
         <div class="flex gap-2 mb-2">
@@ -103,10 +109,8 @@
   </div>
 </template>
 
-<!-- JS externo -->
+<!-- JS do Dashboard e envio para Google Sheets -->
 <script src="script.js"></script>
 
 </body>
 </html>
-
-
