@@ -6,7 +6,12 @@ const MACHINE_NAMES = [
   'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
   '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
 ];
-
+// =============================
+// ESTADO GLOBAL (OBRIGATÓRIO)
+// =============================
+let state = {
+  machines: []
+};
 // =============================
 // FIREBASE
 // =============================
@@ -258,3 +263,4 @@ REF.on('value',snap=>{
   });
   render();
 });
+
