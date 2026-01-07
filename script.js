@@ -26,7 +26,7 @@ const REF = db.ref('usinagem_dashboard_v18_6');
 // =============================
 // GOOGLE SHEETS
 // =============================
-const SHEET_ID = 'COLOQUE_AQUI_O_ID_DA_PLANILHA';
+const SHEET_ID = '1b-JLaNp19aiif3nzf_qiZHeGtQPd_LT-0wldRGUPHzE';
 const CLIENT_ID = '584894443570-srve3dj4h0b7cr5ndssgttn112tb2tv0.apps.googleusercontent.com';
 const RANGE = 'Controle de produção';
 
@@ -378,4 +378,5 @@ REF.once('value',snap=>{
   else{ state.machines=MACHINE_NAMES.map(name=>data[name]||{ id:name, history:[], future:[] }); }
   render();
 });
+
 
