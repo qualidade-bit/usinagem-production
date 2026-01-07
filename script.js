@@ -147,7 +147,6 @@ function render() {
     const clone = tpl.content.cloneNode(true);
     const root = clone.querySelector('div');
 
-    // Selecionar elementos dentro do root
     const title = root.querySelector('[data-role="title"]');
     const subtitle = root.querySelector('[data-role="subtitle"]');
     const operatorInput = root.querySelector('[data-role="operator"]');
@@ -178,77 +177,80 @@ function render() {
     predictedEl.textContent = m.predicted;
 
     // ===== CHART =====
-    const ctx = root.querySelector('[data-role="chart"]').getContext('2d');
-    if (m._chart) m._chart.destroy();
-    m._chart = new Chart(ctx, {
-      type:'bar',
-      data:{
-        labels:['Previsto','Realizado'],
-        datasets:[{
-          data:[m.predicted, m.produced || 0],
-          backgroundColor:['rgba(0,200,0,.4)','rgba(255,255,255,.3)']
-        }]
-      },
-      options:{ plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true }} }
-    });
+    const canvas = root.querySelector('[data-role="chart"]');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (m._chart) m._chart.destroy();
 
-    function atualizarGrafico() {
-      const prod = Number(m.produced);
-      const ratio = (m.predicted > 0 && !isNaN(prod)) ? (prod / m.predicted) * 100 : 0;
+      m._chart = new Chart(ctx, {
+        type:'bar',
+        data:{
+          labels:['Previsto','Realizado'],
+          datasets:[{
+            data:[m.predicted, m.produced || 0],
+            backgroundColor:['rgba(0,200,0,.4)','rgba(255,255,255,.3)']
+          }]
+        },
+        options:{ plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true }} }
+      });
 
-      let cor='rgba(255,255,255,.3)', txt='text-gray-400';
-      if (ratio < 50) { cor='rgba(255,0,0,.6)'; txt='text-red-500'; }
-      else if (ratio < 80) { cor='rgba(255,255,0,.6)'; txt='text-yellow-400'; }
-      else { cor='rgba(0,255,0,.6)'; txt='text-green-400'; }
+      function atualizarGrafico() {
+        const prod = Number(m.produced);
+        const ratio = (m.predicted > 0 && !isNaN(prod)) ? (prod / m.predicted) * 100 : 0;
 
-      m._chart.data.datasets[0].data=[m.predicted, prod||0];
-      m._chart.data.datasets[0].backgroundColor=['rgba(0,200,0,.4)',cor];
-      m._chart.update();
+        let cor='rgba(255,255,255,.3)', txt='text-gray-400';
+        if (ratio < 50) { cor='rgba(255,0,0,.6)'; txt='text-red-500'; }
+        else if (ratio < 80) { cor='rgba(255,255,0,.6)'; txt='text-yellow-400'; }
+        else { cor='rgba(0,255,0,.6)'; txt='text-green-400'; }
 
-      perfEl.className=`text-center text-sm font-semibold mt-1 ${txt}`;
-      perfEl.textContent=`Desempenho: ${ratio.toFixed(1)}%`;
+        m._chart.data.datasets[0].data=[m.predicted, prod||0];
+        m._chart.data.datasets[0].backgroundColor=['rgba(0,200,0,.4)',cor];
+        m._chart.update();
+
+        perfEl.className=`text-center text-sm font-semibold mt-1 ${txt}`;
+        perfEl.textContent=`Desempenho: ${ratio.toFixed(1)}%`;
+      }
+
+      atualizarGrafico();
+
+      // ===== EVENTOS =====
+      saveBtn.addEventListener('click', () => {
+        m.operator = operatorInput.value.trim();
+        m.process = processInput.value.trim();
+        m.cycleMin = parseTempoMinutos(cycleInput.value);
+        m.trocaMin = parseTempoMinutos(trocaInput.value);
+        m.setupMin = parseTempoMinutos(setupInput.value);
+        m.startTime = startInput.value;
+        m.endTime = endInput.value;
+        m.produced = producedInput.value===''?null:Number(producedInput.value);
+        m.predicted = calcularPrevisto(m.cycleMin,m.trocaMin,m.setupMin,m.startTime,m.endTime);
+
+        salvarMaquina(m);
+        predictedEl.textContent = m.predicted;
+        atualizarGrafico();
+        notificar('Dashboard atualizado', `Máquina ${m.id} salva`);
+      });
+
+      addHistoryBtn.addEventListener('click', () => {
+        if (!m.history) m.history = [];
+        m.history.push({
+          operador: m.operator,
+          processo: m.process,
+          ciclo: m.cycleMin,
+          produzidas: m.produced ?? 0,
+          timestamp: new Date().toISOString()
+        });
+        salvarMaquina(m);
+        notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
+      });
+
+      clearHistoryBtn.addEventListener('click', () => {
+        m.history = [];
+        salvarMaquina(m);
+        notificar('Histórico limpo', `Máquina ${m.id} teve histórico limpo`);
+      });
     }
 
-    // ===== EVENTOS =====
-    saveBtn.addEventListener('click', () => {
-      m.operator = operatorInput.value.trim();
-      m.process = processInput.value.trim();
-      m.cycleMin = parseTempoMinutos(cycleInput.value);
-      m.trocaMin = parseTempoMinutos(trocaInput.value);
-      m.setupMin = parseTempoMinutos(setupInput.value);
-      m.startTime = startInput.value;
-      m.endTime = endInput.value;
-      m.produced = producedInput.value===''?null:Number(producedInput.value);
-      m.predicted = calcularPrevisto(m.cycleMin,m.trocaMin,m.setupMin,m.startTime,m.endTime);
-
-      salvarMaquina(m);
-      predictedEl.textContent = m.predicted;
-      atualizarGrafico();
-      notificar('Dashboard atualizado', `Máquina ${m.id} salva`);
-    });
-
-    addHistoryBtn.addEventListener('click', () => {
-      if (!m.history) m.history = [];
-      m.history.push({
-        operador: m.operator,
-        processo: m.process,
-        ciclo: m.cycleMin,
-        produzidas: m.produced ?? 0,
-        timestamp: new Date().toISOString()
-      });
-      salvarMaquina(m);
-      notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
-    });
-
-    clearHistoryBtn.addEventListener('click', () => {
-      m.history = [];
-      salvarMaquina(m);
-      notificar('Histórico limpo', `Máquina ${m.id} teve histórico limpo`);
-    });
-
-    atualizarGrafico();
-
-    // Adiciona ao container **depois de vincular eventos**
     container.appendChild(root);
   });
 }
