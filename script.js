@@ -28,7 +28,7 @@ const REF = db.ref('usinagem_dashboard_v18_6');
 // =============================
 const SHEET_ID = 'COLOQUE_AQUI_O_ID_DA_PLANILHA';
 const CLIENT_ID = '584894443570-srve3dj4h0b7cr5ndssgttn112tb2tv0.apps.googleusercontent.com';
-const RANGE = 'Sheet1!A1';
+const RANGE = 'Controle de produção';
 
 function initGAPI() {
   gapi.load('client:auth2', async () => {
@@ -378,3 +378,4 @@ REF.once('value',snap=>{
   else{ state.machines=MACHINE_NAMES.map(name=>data[name]||{ id:name, history:[], future:[] }); }
   render();
 });
+
