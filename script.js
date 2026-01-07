@@ -162,6 +162,13 @@ function render() {
     const clearHistoryBtn = root.querySelector('[data-role="clearHistory"]');
     const predictedEl = root.querySelector('[data-role="predicted"]');
     const perfEl = root.querySelector('[data-role="performance"]');
+    const historyContainer = root.querySelector('[data-role="history"]');
+
+    // Lista de espera
+    const futureInput = root.querySelector('[data-role="futureInput"]');
+    const prioritySelect = root.querySelector('[data-role="prioritySelect"]');
+    const addFutureBtn = root.querySelector('[data-role="addFuture"]');
+    const futureList = root.querySelector('[data-role="futureList"]');
 
     title.textContent = m.id;
     subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
@@ -176,10 +183,10 @@ function render() {
     producedInput.value = m.produced ?? '';
     predictedEl.textContent = m.predicted;
 
-    container.appendChild(root); // Anexa primeiro
+    container.appendChild(root);
 
+    // ===== GRÁFICO =====
     const canvas = root.querySelector('[data-role="chart"]');
-
     if (canvas && canvas.offsetWidth > 0 && canvas.offsetHeight > 0) {
       const ctx = canvas.getContext('2d');
       if (m._chart) m._chart.destroy();
@@ -220,7 +227,7 @@ function render() {
 
       atualizarGrafico();
 
-      // Eventos
+      // ===== EVENTOS =====
       saveBtn.addEventListener('click', () => {
         m.operator = operatorInput.value.trim();
         m.process = processInput.value.trim();
@@ -240,24 +247,60 @@ function render() {
 
       addHistoryBtn.addEventListener('click', () => {
         if (!m.history) m.history = [];
-        m.history.push({
+        const item = {
           operador: m.operator,
           processo: m.process,
           ciclo: m.cycleMin,
           produzidas: m.produced ?? 0,
           timestamp: new Date().toISOString()
-        });
+        };
+        m.history.push(item);
         salvarMaquina(m);
         notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
+
+        // Atualiza visualmente abaixo do gráfico
+        historyContainer.innerHTML = '';
+        m.history.slice().reverse().forEach(h => {
+          const div = document.createElement('div');
+          div.textContent = `${h.timestamp.split('T')[0]} ${h.timestamp.split('T')[1].split('.')[0]} — ${h.operador} · ${h.processo} · ${h.produzidas} peças`;
+          historyContainer.appendChild(div);
+        });
       });
 
       clearHistoryBtn.addEventListener('click', () => {
         m.history = [];
         salvarMaquina(m);
+        historyContainer.innerHTML = '';
         notificar('Histórico limpo', `Máquina ${m.id} teve histórico limpo`);
       });
+
+      // ===== LISTA DE ESPERA =====
+      function atualizarFutureList() {
+        // Ordena por prioridade: vermelho > amarelo > verde
+        const prioridade = { vermelho: 3, amarelo: 2, verde: 1 };
+        const lista = m.future.slice().sort((a,b) => prioridade[b.priority]-prioridade[a.priority]);
+        futureList.innerHTML = '';
+        lista.forEach(f => {
+          const div = document.createElement('div');
+          div.textContent = `${f.item} [${f.priority}]`;
+          futureList.appendChild(div);
+        });
+      }
+
+      addFutureBtn.addEventListener('click', () => {
+        const val = futureInput.value.trim();
+        const prio = prioritySelect.value;
+        if (!val) return;
+        if (!m.future) m.future = [];
+        m.future.push({ item: val, priority: prio });
+        salvarMaquina(m);
+        futureInput.value = '';
+        atualizarFutureList();
+      });
+
+      // Carrega lista existente
+      if (m.future) atualizarFutureList();
     } else {
-      // Retenta se canvas ainda não estiver visível
       setTimeout(render, 100);
     }
   });
