@@ -36,14 +36,9 @@ function parseMin(v) {
   return Number(v.replace(',', '.')) || 0;
 }
 
-function formatMMSS(min) {
-  const s = Math.round(min * 60);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
-
 function calcularPrevisto(ciclo) {
   if (!ciclo) return 0;
-  return Math.floor(525 / ciclo); // jornada padrão
+  return Math.floor(525 / ciclo);
 }
 
 // =============================
@@ -58,18 +53,18 @@ function render() {
     const root = tpl.content.cloneNode(true).firstElementChild;
     const $ = r => root.querySelector(`[data-role="${r}"]`);
 
-    // Preencher campos
+    // Dados
     $('title').textContent = m.id;
     $('operator').value = m.operator || '';
     $('process').value = m.process || '';
-    $('cycle').value = m.cycle ? formatMMSS(m.cycle) : '';
+    $('cycle').value = m.cycle || '';
     $('produced').value = m.produced ?? '';
     $('observacao').value = m.observacao || '';
     $('predicted').textContent = m.predicted || 0;
 
-    // HISTÓRICO
+    // Histórico
     $('history').innerHTML = (m.history || []).map(h => `
-      <div class="border-b border-gray-700 mb-1 pb-1">
+      <div class="border-b border-gray-700 pb-1 mb-1">
         <b>${h.data}</b><br>
         ${h.processo}<br>
         ${h.produzidas} peças — ${h.eficiencia}%<br>
@@ -77,7 +72,7 @@ function render() {
       </div>
     `).join('');
 
-    // EVENTS
+    // Eventos
     $('save').onclick = () => {
       m.operator = $('operator').value.trim();
       m.process = $('process').value.trim();
@@ -91,12 +86,12 @@ function render() {
     $('addHistory').onclick = () => {
       if (!m.history) m.history = [];
       const eficiencia = m.predicted > 0
-        ? ((m.produced || 0) / m.predicted * 100).toFixed(1)
+        ? ((m.produced / m.predicted) * 100).toFixed(1)
         : '0.0';
 
       m.history.unshift({
         processo: m.process,
-        produzidas: m.produced || 0,
+        produzidas: m.produced,
         eficiencia,
         obs: m.observacao || '',
         data: new Date().toLocaleString()
@@ -105,54 +100,64 @@ function render() {
       salvar(m);
     };
 
-    // 👉 INSERE NO DOM PRIMEIRO
+    // INSERE NO DOM PRIMEIRO
     container.appendChild(root);
 
     // =============================
-    // GRÁFICO (AGORA 100% SEGURO)
+    // GRÁFICO – SOLUÇÃO DEFINITIVA
     // =============================
     const canvas = $('chart');
-    const ctx = canvas.getContext('2d');
 
-    if (m._chart) {
-      m._chart.destroy();
-      m._chart = null;
-    }
+    // 🔒 BLOQUEIO ABSOLUTO DE ERRO
+    if (!canvas || !canvas.isConnected) return;
 
-    const eficiencia = m.predicted > 0
-      ? (m.produced / m.predicted) * 100
-      : 0;
+    requestAnimationFrame(() => {
+      // garante layout calculado
+      if (!canvas.isConnected) return;
 
-    let cor = '#22c55e';
-    let classe = 'text-green-500';
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    if (eficiencia < 50) {
-      cor = '#dc2626';
-      classe = 'text-red-500';
-    } else if (eficiencia < 75) {
-      cor = '#facc15';
-      classe = 'text-yellow-400';
-    }
-
-    m._chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Previsto', 'Realizado'],
-        datasets: [{
-          data: [m.predicted || 0, m.produced || 0],
-          backgroundColor: ['#16a34a', cor]
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+      if (m._chart) {
+        m._chart.destroy();
+        m._chart = null;
       }
-    });
 
-    $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
-    $('performance').className = `text-center text-sm font-semibold mt-1 ${classe}`;
+      const eficiencia = m.predicted > 0
+        ? (m.produced / m.predicted) * 100
+        : 0;
+
+      let cor = '#22c55e';
+      let classe = 'text-green-500';
+
+      if (eficiencia < 50) {
+        cor = '#dc2626';
+        classe = 'text-red-500';
+      } else if (eficiencia < 75) {
+        cor = '#facc15';
+        classe = 'text-yellow-400';
+      }
+
+      m._chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Previsto', 'Realizado'],
+          datasets: [{
+            data: [m.predicted || 0, m.produced || 0],
+            backgroundColor: ['#16a34a', cor]
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
+      $('performance').className = `text-center text-sm font-semibold mt-1 ${classe}`;
+    });
   });
 }
 
