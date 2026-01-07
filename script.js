@@ -1,5 +1,5 @@
 // =============================
-// CONFIGURAÇÕES
+// CONFIG
 // =============================
 const MACHINE_NAMES = [
   'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
@@ -24,13 +24,13 @@ const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
 
 // =============================
-// UTIL
+// UTILS
 // =============================
 const parseMin = v => {
   if (!v) return 0;
   if (v.includes(':')) {
     const [m,s=0] = v.split(':').map(Number);
-    return m + s/60;
+    return m + s / 60;
   }
   return Number(v.replace(',','.')) || 0;
 };
@@ -39,7 +39,28 @@ const previsto = ciclo => ciclo ? Math.floor(525 / ciclo) : 0;
 
 const corEficiencia = e =>
   e < 50 ? '#dc2626' :
-  e < 75 ? '#facc15' : '#16a34a';
+  e < 75 ? '#facc15' :
+  '#16a34a';
+
+// =============================
+// SALVAR (OBJETO LIMPO)
+// =============================
+function salvar(m) {
+  const clean = {
+    id: m.id,
+    operator: m.operator || '',
+    process: m.process || '',
+    cycleRaw: m.cycleRaw || '',
+    cycle: m.cycle || 0,
+    produced: m.produced || 0,
+    obs: m.obs || '',
+    predicted: m.predicted || 0,
+    history: Array.isArray(m.history) ? m.history : [],
+    future: Array.isArray(m.future) ? m.future : []
+  };
+
+  REF.child(m.id).set(clean);
+}
 
 // =============================
 // RENDER
@@ -62,8 +83,8 @@ function render() {
     $('predicted').textContent = m.predicted || 0;
 
     // ================= HISTÓRICO =================
-    const histBox = $('history');
-    histBox.innerHTML = '';
+    const hist = $('history');
+    hist.innerHTML = '';
     (m.history || []).forEach(h => {
       const d = document.createElement('div');
       d.className = 'border-b border-gray-700 pb-1 mb-1';
@@ -72,7 +93,7 @@ function render() {
         <div>${h.qtd} peças — <b>${h.eficiencia}%</b></div>
         ${h.obs ? `<div>📝 ${h.obs}</div>` : ''}
       `;
-      histBox.appendChild(d);
+      hist.appendChild(d);
     });
 
     // ================= BOTÕES =================
@@ -111,7 +132,8 @@ function render() {
       const d = document.createElement('div');
       d.className = `flex justify-between px-2 py-1 rounded text-sm ${
         f.priority === 'vermelho' ? 'bg-red-600' :
-        f.priority === 'amarelo' ? 'bg-yellow-500' : 'bg-green-600'
+        f.priority === 'amarelo' ? 'bg-yellow-500' :
+        'bg-green-600'
       }`;
       d.innerHTML = `<span>${f.item}</span><button>✕</button>`;
       d.querySelector('button').onclick = () => {
@@ -134,7 +156,10 @@ function render() {
       const v = $('futureInput').value.trim();
       if (!v) return;
       if (!m.future) m.future = [];
-      m.future.push({ item: v, priority: $('prioritySelect').value });
+      m.future.push({
+        item: v,
+        priority: $('prioritySelect').value
+      });
       $('futureInput').value = '';
       salvar(m);
     };
@@ -161,7 +186,7 @@ function render() {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => ctx.raw.toFixed(1) + '%'
+              label: c => c.raw.toFixed(1) + '%'
             }
           }
         },
@@ -179,10 +204,6 @@ function render() {
 // =============================
 // FIREBASE SYNC
 // =============================
-function salvar(m) {
-  REF.child(m.id).set(m);
-}
-
 REF.on('value', snap => {
   const d = snap.val() || {};
   state.machines = MACHINE_NAMES.map(id => ({
