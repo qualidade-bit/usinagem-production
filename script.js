@@ -300,7 +300,7 @@ function render() {
 
      if (f.priority === 'vermelho') {
   badge.style.backgroundColor = '#b91c1c'; 
-  badge.style.color = '#000';
+  badge.style.color = '#fff';
 } else if (f.priority === 'amarelo') {
   badge.style.backgroundColor = '#eab308';
   badge.style.color = '#000';
@@ -596,5 +596,6 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
 
