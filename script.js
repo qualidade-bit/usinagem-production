@@ -41,6 +41,12 @@ function calcularPrevisto(ciclo) {
   return Math.floor(525 / ciclo);
 }
 
+function prioridadeCor(p) {
+  if (p === 'vermelho') return 'bg-red-600';
+  if (p === 'amarelo') return 'bg-yellow-500';
+  return 'bg-green-600';
+}
+
 // =============================
 // RENDER
 // =============================
@@ -53,7 +59,7 @@ function render() {
     const root = tpl.content.cloneNode(true).firstElementChild;
     const $ = r => root.querySelector(`[data-role="${r}"]`);
 
-    // Dados
+    // ===== DADOS =====
     $('title').textContent = m.id;
     $('operator').value = m.operator || '';
     $('process').value = m.process || '';
@@ -62,17 +68,23 @@ function render() {
     $('observacao').value = m.observacao || '';
     $('predicted').textContent = m.predicted || 0;
 
-    // Histórico
-    $('history').innerHTML = (m.history || []).map(h => `
-      <div class="border-b border-gray-700 pb-1 mb-1">
-        <b>${h.data}</b><br>
-        ${h.processo}<br>
-        ${h.produzidas} peças — ${h.eficiencia}%<br>
-        ${h.obs ? '📝 ' + h.obs : ''}
-      </div>
-    `).join('');
+    // ===== HISTÓRICO =====
+    const historyBox = $('history');
+    historyBox.innerHTML = '';
 
-    // Eventos
+    (m.history || []).forEach(h => {
+      const div = document.createElement('div');
+      div.className = 'border-b border-gray-700 pb-1 mb-1';
+      div.innerHTML = `
+        <div><b>${h.data}</b></div>
+        <div>${h.processo}</div>
+        <div>${h.produzidas} peças — <b>${h.eficiencia}%</b></div>
+        ${h.obs ? `<div>📝 ${h.obs}</div>` : ''}
+      `;
+      historyBox.appendChild(div);
+    });
+
+    // ===== EVENTOS =====
     $('save').onclick = () => {
       m.operator = $('operator').value.trim();
       m.process = $('process').value.trim();
@@ -85,6 +97,7 @@ function render() {
 
     $('addHistory').onclick = () => {
       if (!m.history) m.history = [];
+
       const eficiencia = m.predicted > 0
         ? ((m.produced / m.predicted) * 100).toFixed(1)
         : '0.0';
@@ -100,64 +113,51 @@ function render() {
       salvar(m);
     };
 
-    // INSERE NO DOM PRIMEIRO
-    container.appendChild(root);
+    $('clearHistory').onclick = () => {
+      if (!m.history || m.history.length === 0) return;
+      m.history = [];
+      salvar(m);
+    };
 
-    // =============================
-    // GRÁFICO – SOLUÇÃO DEFINITIVA
-    // =============================
-    const canvas = $('chart');
+    // ===== LISTA DE ESPERA =====
+    const futureList = $('futureList');
+    futureList.innerHTML = '';
 
-    // 🔒 BLOQUEIO ABSOLUTO DE ERRO
-    if (!canvas || !canvas.isConnected) return;
-
-    requestAnimationFrame(() => {
-      // garante layout calculado
-      if (!canvas.isConnected) return;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      if (m._chart) {
-        m._chart.destroy();
-        m._chart = null;
-      }
-
-      const eficiencia = m.predicted > 0
-        ? (m.produced / m.predicted) * 100
-        : 0;
-
-      let cor = '#22c55e';
-      let classe = 'text-green-500';
-
-      if (eficiencia < 50) {
-        cor = '#dc2626';
-        classe = 'text-red-500';
-      } else if (eficiencia < 75) {
-        cor = '#facc15';
-        classe = 'text-yellow-400';
-      }
-
-      m._chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Previsto', 'Realizado'],
-          datasets: [{
-            data: [m.predicted || 0, m.produced || 0],
-            backgroundColor: ['#16a34a', cor]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true } }
-        }
-      });
-
-      $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
-      $('performance').className = `text-center text-sm font-semibold mt-1 ${classe}`;
+    (m.future || []).forEach((f, i) => {
+      const div = document.createElement('div');
+      div.className = `flex justify-between items-center px-2 py-1 rounded text-sm ${prioridadeCor(f.priority)}`;
+      div.innerHTML = `
+        <span>${f.item}</span>
+        <button class="text-white font-bold">✕</button>
+      `;
+      div.querySelector('button').onclick = () => {
+        m.future.splice(i, 1);
+        salvar(m);
+      };
+      futureList.appendChild(div);
     });
+
+    new Sortable(futureList, {
+      animation: 150,
+      onEnd: e => {
+        const [item] = m.future.splice(e.oldIndex, 1);
+        m.future.splice(e.newIndex, 0, item);
+        salvar(m);
+      }
+    });
+
+    $('addFuture').onclick = () => {
+      const val = $('futureInput').value.trim();
+      const prio = $('prioritySelect').value;
+      if (!val) return;
+      if (!m.future) m.future = [];
+      m.future.push({ item: val, priority: prio });
+      $('futureInput').value = '';
+      salvar(m);
+    };
+
+    // ===== INSERE CARD =====
+    container.appendChild(root);
   });
 }
 
@@ -172,7 +172,9 @@ REF.on('value', snap => {
   const data = snap.val() || {};
   state.machines = MACHINE_NAMES.map(id => ({
     id,
-    ...data[id]
+    ...data[id],
+    history: data[id]?.history || [],
+    future: data[id]?.future || []
   }));
   render();
 });
