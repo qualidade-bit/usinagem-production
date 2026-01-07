@@ -3,9 +3,9 @@
 // =============================
 
 const MACHINE_NAMES = [
- 'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
- 'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
- '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
+  'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
+  'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
+  '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
 ];
 
 // =============================
@@ -144,24 +144,25 @@ function render() {
 
   state.machines.forEach(m => {
     const tpl = document.getElementById('machine-template');
-    const node = tpl.content.cloneNode(true);
-    const root = node.querySelector('div');
+    const clone = tpl.content.cloneNode(true);
+    const root = clone.querySelector('div');
 
-    const title = node.querySelector('[data-role="title"]');
-    const subtitle = node.querySelector('[data-role="subtitle"]');
-    const operatorInput = node.querySelector('[data-role="operator"]');
-    const processInput = node.querySelector('[data-role="process"]');
-    const cycleInput = node.querySelector('[data-role="cycle"]');
-    const trocaInput = node.querySelector('[data-role="troca"]');
-    const setupInput = node.querySelector('[data-role="setup"]');
-    const startInput = node.querySelector('[data-role="startTime"]');
-    const endInput = node.querySelector('[data-role="endTime"]');
-    const producedInput = node.querySelector('[data-role="produced"]');
-    const saveBtn = node.querySelector('[data-role="save"]');
-    const addHistoryBtn = node.querySelector('[data-role="addHistory"]');
-    const clearHistoryBtn = node.querySelector('[data-role="clearHistory"]');
-    const predictedEl = node.querySelector('[data-role="predicted"]');
-    const perfEl = node.querySelector('[data-role="performance"]');
+    // Selecionar elementos dentro do root
+    const title = root.querySelector('[data-role="title"]');
+    const subtitle = root.querySelector('[data-role="subtitle"]');
+    const operatorInput = root.querySelector('[data-role="operator"]');
+    const processInput = root.querySelector('[data-role="process"]');
+    const cycleInput = root.querySelector('[data-role="cycle"]');
+    const trocaInput = root.querySelector('[data-role="troca"]');
+    const setupInput = root.querySelector('[data-role="setup"]');
+    const startInput = root.querySelector('[data-role="startTime"]');
+    const endInput = root.querySelector('[data-role="endTime"]');
+    const producedInput = root.querySelector('[data-role="produced"]');
+    const saveBtn = root.querySelector('[data-role="save"]');
+    const addHistoryBtn = root.querySelector('[data-role="addHistory"]');
+    const clearHistoryBtn = root.querySelector('[data-role="clearHistory"]');
+    const predictedEl = root.querySelector('[data-role="predicted"]');
+    const perfEl = root.querySelector('[data-role="performance"]');
 
     title.textContent = m.id;
     subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
@@ -176,12 +177,9 @@ function render() {
     producedInput.value = m.produced ?? '';
     predictedEl.textContent = m.predicted;
 
-    container.appendChild(root);
-
     // ===== CHART =====
     const ctx = root.querySelector('[data-role="chart"]').getContext('2d');
     if (m._chart) m._chart.destroy();
-
     m._chart = new Chart(ctx, {
       type:'bar',
       data:{
@@ -191,10 +189,7 @@ function render() {
           backgroundColor:['rgba(0,200,0,.4)','rgba(255,255,255,.3)']
         }]
       },
-      options:{
-        plugins:{ legend:{ display:false }},
-        scales:{ y:{ beginAtZero:true }}
-      }
+      options:{ plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true }} }
     });
 
     function atualizarGrafico() {
@@ -232,7 +227,6 @@ function render() {
       notificar('Dashboard atualizado', `Máquina ${m.id} salva`);
     });
 
-    // Adicionar ao histórico
     addHistoryBtn.addEventListener('click', () => {
       if (!m.history) m.history = [];
       m.history.push({
@@ -246,7 +240,6 @@ function render() {
       notificar('Histórico atualizado', `Máquina ${m.id} adicionada ao histórico`);
     });
 
-    // Limpar histórico
     clearHistoryBtn.addEventListener('click', () => {
       m.history = [];
       salvarMaquina(m);
@@ -254,6 +247,9 @@ function render() {
     });
 
     atualizarGrafico();
+
+    // Adiciona ao container **depois de vincular eventos**
+    container.appendChild(root);
   });
 }
 
@@ -274,7 +270,7 @@ REF.on('value', snap => {
 });
 
 // =============================
-// CSV / BOTÕES FIXOS
+// BOTÕES FIXOS
 // =============================
 
 function exportCSV() {
