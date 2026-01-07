@@ -1,252 +1,197 @@
-// =============================
-// CONFIGURAÇÕES INICIAIS
-// =============================
-const MACHINE_NAMES = [
-  'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
-  'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
-  '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
-];
+/*************************************************
+ * ESTADO GLOBAL (SEM DEPENDER DO HTML)
+ *************************************************/
+const state = {
+  cards: {},
+  historico: [],
+  espera: []
+};
 
-let state = { machines: [] };
-
-// =============================
-// FIREBASE
-// =============================
-firebase.initializeApp({
-  apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
-  authDomain: "dashboardusinagem.firebaseapp.com",
-  projectId: "dashboardusinagem",
-  storageBucket: "dashboardusinagem.appspot.com",
-  messagingSenderId: "677023128312",
-  appId: "1:677023128312:web:75376363a62105f360f90d"
-});
-
-const db = firebase.database();
-const REF = db.ref('usinagem_dashboard_v18_6');
-
-// =============================
-// FUNÇÕES AUXILIARES
-// =============================
-function parseMin(v){
-  if(!v) return 0;
-  if(String(v).includes(':')){
-    const p=v.split(':').map(Number);
-    return p[0] + (p[1]||0)/60;
-  }
-  return Number(String(v).replace(',','.'))||0;
+/*************************************************
+ * UTILIDADES
+ *************************************************/
+function $(id) {
+  return document.getElementById(id);
 }
 
-function formatMMSS(m){
-  if(!m) return '-';
-  const s=Math.round(m*60);
-  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+function corPorEficiencia(ef) {
+  if (ef < 50) return '#dc2626';   // vermelho
+  if (ef < 75) return '#facc15';   // amarelo
+  return '#16a34a';                // verde
 }
 
-function minutosDisponiveis(i,f){
-  const t=x=>{const[a,b]=x.split(':').map(Number);return a*60+b};
-  let d=t(f)-t(i);
-  if(d<=0) return 0;
-  if(t(f)>720&&t(i)<780) d-=Math.min(t(f),780)-Math.max(t(i),720);
-  return Math.max(d,0);
+function prioridadeCor(p) {
+  if (p === 'alta') return '#dc2626';
+  if (p === 'media') return '#facc15';
+  return '#16a34a';
 }
 
-function calcularPrevisto(c,t,s,i,f){
-  const disp=Math.max(minutosDisponiveis(i,f)-s,0);
-  return disp>0&&(c+t)>0?Math.floor(disp/(c+t)):0;
-}
+/*************************************************
+ * GRÁFICO
+ *************************************************/
+let chart;
 
-function baseMachine(id){
-  return {
-    id,operator:'',process:'',cycle:0,troca:0,setup:0,
-    start:'07:00',end:'16:45',produced:0,predicted:0,
-    observation:'',history:[],future:[]
-  };
-}
+function renderGrafico() {
+  const canvas = $('graficoComparativo');
+  if (!canvas) return;
 
-function salvar(m){
-  REF.child(m.id).set(m);
-}
+  const labels = [];
+  const dados = [];
+  const cores = [];
 
-// =============================
-// RENDER
-// =============================
-function render(){
-  const cont=document.getElementById('machinesContainer');
-  if(!cont) return;
-  cont.innerHTML='';
+  state.historico.forEach(h => {
+    labels.push(h.maquina);
+    dados.push(h.eficiencia);
+    cores.push(corPorEficiencia(h.eficiencia));
+  });
 
-  state.machines.forEach(m=>{
-    const tpl=document.getElementById('machine-template');
-    if(!tpl) return;
+  if (chart) chart.destroy();
 
-    const card=tpl.content.cloneNode(true).firstElementChild;
-    const $=q=>card.querySelector(q);
-
-    const title=$('[data-role="title"]');
-    if(title) title.textContent=m.id;
-
-    const operator=$('[data-role="operator"]');
-    const process=$('[data-role="process"]');
-    const cycle=$('[data-role="cycle"]');
-    const troca=$('[data-role="troca"]');
-    const setup=$('[data-role="setup"]');
-    const start=$('[data-role="startTime"]');
-    const end=$('[data-role="endTime"]');
-    const produced=$('[data-role="produced"]');
-    const obs=$('[data-role="observation"]');
-
-    if(operator) operator.value=m.operator;
-    if(process) process.value=m.process;
-    if(cycle) cycle.value=formatMMSS(m.cycle);
-    if(troca) troca.value=formatMMSS(m.troca);
-    if(setup) setup.value=formatMMSS(m.setup);
-    if(start) start.value=m.start;
-    if(end) end.value=m.end;
-    if(produced) produced.value=m.produced||'';
-    if(obs) obs.value=m.observation||'';
-
-    const predictedEl=$('[data-role="predicted"]');
-    if(predictedEl) predictedEl.textContent=m.predicted;
-
-    // ===== HISTÓRICO
-    const hist=$('[data-role="history"]');
-    if(hist){
-      hist.innerHTML='';
-      m.history.slice().reverse().forEach(h=>{
-        const d=document.createElement('div');
-        d.textContent=
-          `Eficiência: ${h.eff}% | Qtd: ${h.qty} | Processo: ${h.process}`+
-          (h.obs?` | Obs: ${h.obs}`:'');
-        hist.appendChild(d);
-      });
-    }
-
-    // ===== BOTÕES
-    const saveBtn=$('[data-role="save"]');
-    if(saveBtn){
-      saveBtn.onclick=()=>{
-        m.operator=operator?operator.value:'';
-        m.process=process?process.value:'';
-        m.cycle=parseMin(cycle?cycle.value:0);
-        m.troca=parseMin(troca?troca.value:0);
-        m.setup=parseMin(setup?setup.value:0);
-        m.start=start?start.value:'07:00';
-        m.end=end?end.value:'16:45';
-        m.produced=produced?Number(produced.value)||0:0;
-        m.observation=obs?obs.value:'';
-        m.predicted=calcularPrevisto(m.cycle,m.troca,m.setup,m.start,m.end);
-        salvar(m);
-        if(predictedEl) predictedEl.textContent=m.predicted;
-        drawChart();
-      };
-    }
-
-    const addHist=$('[data-role="addHistory"]');
-    if(addHist){
-      addHist.onclick=()=>{
-        const eff=m.predicted>0?((m.produced/m.predicted)*100).toFixed(1):0;
-        m.history.push({
-          qty:m.produced,
-          process:m.process,
-          eff,
-          obs:m.observation||''
-        });
-        salvar(m);
-      };
-    }
-
-    const clearHist=$('[data-role="clearHistory"]');
-    if(clearHist){
-      clearHist.onclick=()=>{
-        if(m.history.length){
-          m.history=[];
-          salvar(m);
+  chart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Eficiência (%)',
+        data: dados,
+        backgroundColor: cores
+      }]
+    },
+    options: {
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.raw.toFixed(1)}%`
+          }
         }
-      };
-    }
-
-    // ===== LISTA DE ESPERA
-    const fInput=$('[data-role="futureInput"]');
-    const fPrio=$('[data-role="prioritySelect"]');
-    const fBtn=$('[data-role="addFuture"]');
-    const fList=$('[data-role="futureList"]');
-
-    function renderFuture(){
-      if(!fList) return;
-      fList.innerHTML='';
-      m.future.sort((a,b)=>b.p-a.p).forEach((f,i)=>{
-        const li=document.createElement('div');
-        li.style.background=f.p===3?'#7f1d1d':f.p===2?'#78350f':'#14532d';
-        li.style.color='#fff';
-        li.style.padding='4px';
-        li.style.display='flex';
-        li.style.justifyContent='space-between';
-        li.textContent=f.t;
-
-        const x=document.createElement('span');
-        x.textContent='✕';
-        x.style.cursor='pointer';
-        x.onclick=()=>{m.future.splice(i,1);salvar(m);};
-
-        li.appendChild(x);
-        fList.appendChild(li);
-      });
-    }
-
-    if(fBtn){
-      fBtn.onclick=()=>{
-        if(!fInput||!fInput.value) return;
-        m.future.push({
-          t:fInput.value,
-          p:{vermelho:3,amarelo:2,verde:1}[fPrio.value]||1
-        });
-        fInput.value='';
-        salvar(m);
-      };
-    }
-
-    // ===== GRÁFICO
-    const canvas=$('[data-role="chart"]');
-    let chart;
-    function drawChart(){
-      if(!canvas) return;
-      if(chart) chart.destroy();
-      chart=new Chart(canvas,{
-        type:'bar',
-        data:{
-          labels:['Previsto','Realizado'],
-          datasets:[{
-            data:[m.predicted,m.produced],
-            backgroundColor:[
-              'rgba(0,255,0,.4)',
-              m.produced<m.predicted*0.5?'rgba(255,0,0,.6)'
-              :m.produced<m.predicted*0.8?'rgba(255,255,0,.6)'
-              :'rgba(0,255,0,.6)'
-            ]
-          }]
-        },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          plugins:{legend:{display:false}},
-          scales:{y:{beginAtZero:true}}
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: v => `${v}%`
+          }
         }
-      });
+      }
     }
-
-    setTimeout(drawChart,50);
-    cont.appendChild(card);
-    renderFuture();
   });
 }
 
-// =============================
-// FIREBASE LISTENER
-// =============================
-REF.on('value',snap=>{
-  const d=snap.val()||{};
-  state.machines=MACHINE_NAMES.map(id=>{
-    return d[id]?{...baseMachine(id),...d[id]}:baseMachine(id);
+/*************************************************
+ * HISTÓRICO
+ *************************************************/
+function renderHistorico() {
+  const container = $('historico');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  state.historico.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'p-2 border-b text-sm';
+
+    div.innerHTML = `
+      <strong>${h.maquina}</strong><br>
+      Processo: ${h.processo}<br>
+      Realizado: ${h.realizado}<br>
+      Eficiência: 
+      <span style="color:${corPorEficiencia(h.eficiencia)}">
+        ${h.eficiencia.toFixed(1)}%
+      </span>
+      ${h.obs ? `<br>Obs: ${h.obs}` : ''}
+    `;
+
+    container.appendChild(div);
   });
-  render();
+
+  renderGrafico();
+}
+
+/*************************************************
+ * LISTA DE ESPERA
+ *************************************************/
+function renderEspera() {
+  const ul = $('listaEspera');
+  if (!ul) return;
+
+  ul.innerHTML = '';
+
+  state.espera
+    .sort((a, b) => a.prioridadeNum - b.prioridadeNum)
+    .forEach((item, index) => {
+      const li = document.createElement('li');
+      li.draggable = true;
+      li.className = 'p-2 mb-1 flex justify-between items-center text-white';
+      li.style.background = prioridadeCor(item.prioridade);
+
+      li.innerHTML = `
+        <span>${item.texto}</span>
+        <button data-i="${index}" class="excluir">✖</button>
+      `;
+
+      li.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('i', index);
+      });
+
+      li.addEventListener('drop', e => {
+        e.preventDefault();
+        const from = e.dataTransfer.getData('i');
+        const to = index;
+        state.espera.splice(to, 0, state.espera.splice(from, 1)[0]);
+        renderEspera();
+      });
+
+      li.addEventListener('dragover', e => e.preventDefault());
+
+      ul.appendChild(li);
+    });
+
+  ul.querySelectorAll('.excluir').forEach(btn => {
+    btn.onclick = () => {
+      state.espera.splice(btn.dataset.i, 1);
+      renderEspera();
+    };
+  });
+}
+
+/*************************************************
+ * BOTÕES
+ *************************************************/
+$('btnAdicionarHistorico')?.addEventListener('click', () => {
+  const previsto = Number($('previsto')?.textContent || 0);
+  const realizado = Number($('realizado')?.value || 0);
+
+  const eficiencia = previsto > 0 ? (realizado / previsto) * 100 : 0;
+
+  state.historico.push({
+    maquina: $('nomeMaquina')?.textContent || 'Máquina',
+    processo: $('processo')?.value || '',
+    realizado,
+    eficiencia,
+    obs: $('observacao')?.value || ''
+  });
+
+  renderHistorico();
 });
+
+$('btnAdicionarEspera')?.addEventListener('click', () => {
+  const texto = $('textoEspera')?.value;
+  const prioridade = $('prioridade')?.value;
+
+  if (!texto || !prioridade) return;
+
+  state.espera.push({
+    texto,
+    prioridade,
+    prioridadeNum: prioridade === 'alta' ? 0 : prioridade === 'media' ? 1 : 2
+  });
+
+  renderEspera();
+});
+
+/*************************************************
+ * INICIAL
+ *************************************************/
+renderHistorico();
+renderEspera();
