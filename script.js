@@ -299,7 +299,7 @@ function render() {
        badge.className = 'wait-badge';
 
      if (f.priority === 'vermelho') {
-  badge.style.backgroundColor = '#dc2626'; 
+  badge.style.backgroundColor = '#b91c1c'; 
   badge.style.color = '#000';
 } else if (f.priority === 'amarelo') {
   badge.style.backgroundColor = '#eab308';
@@ -596,4 +596,5 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
 
