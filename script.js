@@ -1,5 +1,5 @@
 // =============================
-// CONFIGURAÇÕES INICIAIS
+// CONFIGURAÇÕES
 // =============================
 const MACHINE_NAMES = [
   'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
@@ -25,7 +25,7 @@ const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
 
 // =============================
-// FUNÇÕES
+// UTILIDADES
 // =============================
 const parseMin = v => {
   if (!v) return 0;
@@ -41,12 +41,13 @@ const formatMMSS = min => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-const calcPrevisto = (ciclo, ini, fim, setup) => {
+const calcPrevisto = (ciclo, ini, fim, setup = 0) => {
+  if (!ini || !fim) return 0;
   const toMin = t => {
     const [h, m] = t.split(':').map(Number);
     return h * 60 + m;
   };
-  let disp = toMin(fim) - toMin(ini) - setup;
+  const disp = toMin(fim) - toMin(ini) - setup;
   if (disp <= 0 || ciclo <= 0) return 0;
   return Math.floor(disp / ciclo);
 };
@@ -61,118 +62,117 @@ function render() {
   state.machines.forEach(m => {
     const tpl = document.getElementById('machine-template');
     const root = tpl.content.cloneNode(true).firstElementChild;
-
     const $ = r => root.querySelector(`[data-role="${r}"]`);
 
-    $('title').textContent = m.id;
+    // Inputs
     $('operator').value = m.operator || '';
     $('process').value = m.process || '';
     $('cycle').value = m.cycle ? formatMMSS(m.cycle) : '';
     $('produced').value = m.produced ?? '';
     $('observacao').value = m.observacao || '';
 
-    // ===== GRÁFICO =====
-    const ctx = $('chart').getContext('2d');
-    if (m._chart) m._chart.destroy();
+    // Previsto
+    $('predicted').textContent = m.predicted || 0;
 
-    const eficiencia = m.predicted > 0
-      ? (m.produced / m.predicted) * 100
-      : 0;
+    // ===== GRÁFICO (BLINDADO) =====
+    const canvas = $('chart');
 
-    let cor = 'green';
-    if (eficiencia < 50) cor = 'red';
-    else if (eficiencia < 75) cor = 'yellow';
+    requestAnimationFrame(() => {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    m._chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Previsto', 'Realizado'],
-        datasets: [{
-          data: [m.predicted, m.produced || 0],
-          backgroundColor: ['#16a34a', cor === 'red' ? '#dc2626' : cor === 'yellow' ? '#facc15' : '#22c55e']
-        }]
-      },
-      options: {
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+      if (m._chart) {
+        m._chart.destroy();
+        m._chart = null;
       }
-    });
 
-    $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
-    $('performance').className =
-      eficiencia < 50 ? 'text-red-500' :
-      eficiencia < 75 ? 'text-yellow-400' :
-      'text-green-500';
+      const eficiencia = m.predicted > 0
+        ? (m.produced / m.predicted) * 100
+        : 0;
+
+      let cor = '#22c55e';
+      let classe = 'text-green-500';
+
+      if (eficiencia < 50) {
+        cor = '#dc2626';
+        classe = 'text-red-500';
+      } else if (eficiencia < 75) {
+        cor = '#facc15';
+        classe = 'text-yellow-400';
+      }
+
+      m._chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Previsto', 'Realizado'],
+          datasets: [{
+            data: [m.predicted || 0, m.produced || 0],
+            backgroundColor: ['#16a34a', cor]
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
+      $('performance').className = `text-center text-sm font-semibold mt-1 ${classe}`;
+    });
 
     // ===== HISTÓRICO =====
     $('addHistory').onclick = () => {
       if (!m.history) m.history = [];
+      const eficiencia = m.predicted > 0
+        ? ((m.produced || 0) / m.predicted * 100).toFixed(1)
+        : '0.0';
+
       m.history.unshift({
         operador: m.operator,
         processo: m.process,
         produzidas: m.produced || 0,
-        eficiencia: eficiencia.toFixed(1),
+        eficiencia,
         obs: m.observacao || '',
         data: new Date().toLocaleString()
       });
+
       salvar(m);
     };
 
-    $('history').innerHTML = (m.history || []).map(h =>
-      `<div class="border-b border-gray-700 pb-1 mb-1">
+    $('history').innerHTML = (m.history || []).map(h => `
+      <div class="border-b border-gray-700 pb-1 mb-1">
         <b>${h.data}</b><br>
         ${h.operador} · ${h.processo}<br>
         ${h.produzidas} peças — ${h.eficiencia}%<br>
         ${h.obs ? '📝 ' + h.obs : ''}
-      </div>`
-    ).join('');
-
-    // ===== LISTA DE ESPERA =====
-    $('addFuture').onclick = () => {
-      if (!m.future) m.future = [];
-      m.future.push({
-        text: $('futureInput').value,
-        prio: $('prioritySelect').value
-      });
-      $('futureInput').value = '';
-      salvar(m);
-    };
-
-    $('futureList').innerHTML = (m.future || []).map((f, i) => `
-      <div class="flex justify-between items-center p-2 rounded
-        ${f.prio === 'vermelho' ? 'bg-red-600' :
-          f.prio === 'amarelo' ? 'bg-yellow-500 text-black' :
-          'bg-green-600'}">
-        ${f.text}
-        <button onclick="removeFuture('${m.id}',${i})">❌</button>
       </div>
     `).join('');
 
-    Sortable.create($('futureList'), {
-      onEnd: e => {
-        const item = m.future.splice(e.oldIndex, 1)[0];
-        m.future.splice(e.newIndex, 0, item);
-        salvar(m);
-      }
-    });
+    // ===== SAVE =====
+    $('save').onclick = () => {
+      m.operator = $('operator').value.trim();
+      m.process = $('process').value.trim();
+      m.cycle = parseMin($('cycle').value);
+      m.produced = Number($('produced').value) || 0;
+      m.observacao = $('observacao').value.trim();
+      m.predicted = calcPrevisto(m.cycle, '07:00', '16:45', 0);
+      salvar(m);
+    };
 
     container.appendChild(root);
   });
 }
 
-function removeFuture(id, index) {
-  const m = state.machines.find(x => x.id === id);
-  m.future.splice(index, 1);
-  salvar(m);
-}
-
+// =============================
+// FIREBASE
+// =============================
 function salvar(m) {
   REF.child(m.id).set(m);
 }
 
-// =============================
-// FIREBASE LISTENER
-// =============================
 REF.on('value', snap => {
   const data = snap.val() || {};
   state.machines = MACHINE_NAMES.map(id => ({
