@@ -27,30 +27,24 @@ const REF = db.ref('usinagem_dashboard_v18_6');
 // =============================
 // UTILIDADES
 // =============================
-const parseMin = v => {
+function parseMin(v) {
   if (!v) return 0;
   if (v.includes(':')) {
-    const p = v.split(':').map(Number);
-    return p[0] + (p[1] || 0) / 60;
+    const [m, s = 0] = v.split(':').map(Number);
+    return m + s / 60;
   }
   return Number(v.replace(',', '.')) || 0;
-};
+}
 
-const formatMMSS = min => {
+function formatMMSS(min) {
   const s = Math.round(min * 60);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
+}
 
-const calcPrevisto = (ciclo, ini, fim, setup = 0) => {
-  if (!ini || !fim) return 0;
-  const toMin = t => {
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  };
-  const disp = toMin(fim) - toMin(ini) - setup;
-  if (disp <= 0 || ciclo <= 0) return 0;
-  return Math.floor(disp / ciclo);
-};
+function calcularPrevisto(ciclo) {
+  if (!ciclo) return 0;
+  return Math.floor(525 / ciclo); // jornada padrão
+}
 
 // =============================
 // RENDER
@@ -64,66 +58,36 @@ function render() {
     const root = tpl.content.cloneNode(true).firstElementChild;
     const $ = r => root.querySelector(`[data-role="${r}"]`);
 
-    // Inputs
+    // Preencher campos
+    $('title').textContent = m.id;
     $('operator').value = m.operator || '';
     $('process').value = m.process || '';
     $('cycle').value = m.cycle ? formatMMSS(m.cycle) : '';
     $('produced').value = m.produced ?? '';
     $('observacao').value = m.observacao || '';
-
-    // Previsto
     $('predicted').textContent = m.predicted || 0;
 
-    // ===== GRÁFICO (BLINDADO) =====
-    const canvas = $('chart');
+    // HISTÓRICO
+    $('history').innerHTML = (m.history || []).map(h => `
+      <div class="border-b border-gray-700 mb-1 pb-1">
+        <b>${h.data}</b><br>
+        ${h.processo}<br>
+        ${h.produzidas} peças — ${h.eficiencia}%<br>
+        ${h.obs ? '📝 ' + h.obs : ''}
+      </div>
+    `).join('');
 
-    requestAnimationFrame(() => {
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    // EVENTS
+    $('save').onclick = () => {
+      m.operator = $('operator').value.trim();
+      m.process = $('process').value.trim();
+      m.cycle = parseMin($('cycle').value);
+      m.produced = Number($('produced').value) || 0;
+      m.observacao = $('observacao').value.trim();
+      m.predicted = calcularPrevisto(m.cycle);
+      salvar(m);
+    };
 
-      if (m._chart) {
-        m._chart.destroy();
-        m._chart = null;
-      }
-
-      const eficiencia = m.predicted > 0
-        ? (m.produced / m.predicted) * 100
-        : 0;
-
-      let cor = '#22c55e';
-      let classe = 'text-green-500';
-
-      if (eficiencia < 50) {
-        cor = '#dc2626';
-        classe = 'text-red-500';
-      } else if (eficiencia < 75) {
-        cor = '#facc15';
-        classe = 'text-yellow-400';
-      }
-
-      m._chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Previsto', 'Realizado'],
-          datasets: [{
-            data: [m.predicted || 0, m.produced || 0],
-            backgroundColor: ['#16a34a', cor]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true } }
-        }
-      });
-
-      $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
-      $('performance').className = `text-center text-sm font-semibold mt-1 ${classe}`;
-    });
-
-    // ===== HISTÓRICO =====
     $('addHistory').onclick = () => {
       if (!m.history) m.history = [];
       const eficiencia = m.predicted > 0
@@ -131,7 +95,6 @@ function render() {
         : '0.0';
 
       m.history.unshift({
-        operador: m.operator,
         processo: m.process,
         produzidas: m.produced || 0,
         eficiencia,
@@ -142,27 +105,54 @@ function render() {
       salvar(m);
     };
 
-    $('history').innerHTML = (m.history || []).map(h => `
-      <div class="border-b border-gray-700 pb-1 mb-1">
-        <b>${h.data}</b><br>
-        ${h.operador} · ${h.processo}<br>
-        ${h.produzidas} peças — ${h.eficiencia}%<br>
-        ${h.obs ? '📝 ' + h.obs : ''}
-      </div>
-    `).join('');
-
-    // ===== SAVE =====
-    $('save').onclick = () => {
-      m.operator = $('operator').value.trim();
-      m.process = $('process').value.trim();
-      m.cycle = parseMin($('cycle').value);
-      m.produced = Number($('produced').value) || 0;
-      m.observacao = $('observacao').value.trim();
-      m.predicted = calcPrevisto(m.cycle, '07:00', '16:45', 0);
-      salvar(m);
-    };
-
+    // 👉 INSERE NO DOM PRIMEIRO
     container.appendChild(root);
+
+    // =============================
+    // GRÁFICO (AGORA 100% SEGURO)
+    // =============================
+    const canvas = $('chart');
+    const ctx = canvas.getContext('2d');
+
+    if (m._chart) {
+      m._chart.destroy();
+      m._chart = null;
+    }
+
+    const eficiencia = m.predicted > 0
+      ? (m.produced / m.predicted) * 100
+      : 0;
+
+    let cor = '#22c55e';
+    let classe = 'text-green-500';
+
+    if (eficiencia < 50) {
+      cor = '#dc2626';
+      classe = 'text-red-500';
+    } else if (eficiencia < 75) {
+      cor = '#facc15';
+      classe = 'text-yellow-400';
+    }
+
+    m._chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Previsto', 'Realizado'],
+        datasets: [{
+          data: [m.predicted || 0, m.produced || 0],
+          backgroundColor: ['#16a34a', cor]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    $('performance').textContent = `Eficiência: ${eficiencia.toFixed(1)}%`;
+    $('performance').className = `text-center text-sm font-semibold mt-1 ${classe}`;
   });
 }
 
