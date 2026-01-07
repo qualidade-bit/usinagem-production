@@ -30,7 +30,7 @@ const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
 
 // =============================
-// FUNÇÕES DE TEMPO (ORIGINAIS)
+// FUNÇÕES DE TEMPO
 // =============================
 function parseTempoMinutos(str){
   if(!str) return 0;
@@ -40,13 +40,11 @@ function parseTempoMinutos(str){
   }
   return Number(str.replace(',','.')) || 0;
 }
-
 function formatMinutesToMMSS(min){
   if(!min) return '-';
   const sec=Math.round(min*60);
   return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
 }
-
 function minutosDisponiveis(i,f){
   const t=x=>{const[a,b]=x.split(':').map(Number);return a*60+b;}
   let d=t(f)-t(i);
@@ -55,7 +53,6 @@ function minutosDisponiveis(i,f){
     d-=Math.min(t(f),780)-Math.max(t(i),720);
   return d;
 }
-
 function calcularPrevisto(ciclo,troca,setup,i,f){
   const disp=Math.max(minutosDisponiveis(i,f)-(setup||0),0);
   const total=ciclo+(troca||0);
@@ -64,7 +61,7 @@ function calcularPrevisto(ciclo,troca,setup,i,f){
 }
 
 // =============================
-// PADRÃO DE MÁQUINA
+// PADRÃO
 // =============================
 function maquinaPadrao(id){
   return {
@@ -82,7 +79,6 @@ function maquinaPadrao(id){
     future:[]
   };
 }
-
 function salvarMaquina(m){
   return REF.child(m.id).set(m);
 }
@@ -100,6 +96,13 @@ function render(){
     const root=node.firstElementChild;
     const q=s=>root.querySelector(s);
 
+    // =============================
+    // HEADER DO CARD ACOMPANHA DADOS
+    // =============================
+    q('[data-role="title"]').textContent = m.id;
+    q('[data-role="subtitle"]').textContent =
+      `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
+
     // INPUTS
     q('[data-role="operator"]').value=m.operator;
     q('[data-role="process"]').value=m.process;
@@ -112,7 +115,7 @@ function render(){
     q('[data-role="predicted"]').textContent=m.predicted;
 
     // =============================
-    // GRÁFICO COMPARATIVO (RESTAURADO)
+    // GRÁFICO COM CORES DINÂMICAS
     // =============================
     const canvas=q('[data-role="chart"]');
     let chart=null;
@@ -122,16 +125,21 @@ function render(){
       const ctx=canvas.getContext('2d');
       if(chart) chart.destroy();
 
+      const prod=m.produced||0;
+      const ratio=m.predicted>0?(prod/m.predicted)*100:0;
+
+      let cor='rgba(255,255,255,.4)';
+      if(ratio<50) cor='rgba(255,0,0,.6)';
+      else if(ratio<80) cor='rgba(255,255,0,.6)';
+      else cor='rgba(0,255,0,.6)';
+
       chart=new Chart(ctx,{
         type:'bar',
         data:{
           labels:['Previsto','Realizado'],
           datasets:[{
-            data:[m.predicted,m.produced||0],
-            backgroundColor:[
-              'rgba(0,200,0,.5)',
-              'rgba(255,255,255,.4)'
-            ]
+            data:[m.predicted,prod],
+            backgroundColor:['rgba(0,200,0,.4)',cor]
           }]
         },
         options:{
@@ -142,7 +150,6 @@ function render(){
         }
       });
     }
-
     setTimeout(atualizarGrafico,50);
 
     // =============================
@@ -159,26 +166,23 @@ function render(){
       m.produced=Number(q('[data-role="produced"]').value)||0;
 
       m.predicted=calcularPrevisto(
-        m.cycleMin,
-        m.trocaMin,
-        m.setupMin,
-        m.startTime,
-        m.endTime
+        m.cycleMin,m.trocaMin,m.setupMin,m.startTime,m.endTime
       );
 
       salvarMaquina(m);
-      q('[data-role="predicted"]').textContent=m.predicted;
-      atualizarGrafico();
+      render();
     };
 
     // =============================
-    // HISTÓRICO (SEM ALTERAR)
+    // HISTÓRICO ORGANIZADO
     // =============================
     const hist=q('[data-role="history"]');
     hist.innerHTML='';
     m.history.slice().reverse().forEach(h=>{
       const d=document.createElement('div');
-      d.textContent=`${h.timestamp.replace('T',' ').split('.')[0]} — ${h.operador} · ${h.processo} · ${h.produzidas}`;
+      d.textContent=
+        `${h.timestamp.replace('T',' ').split('.')[0]} | ` +
+        `Op: ${h.operador} | Proc: ${h.processo} | Qtd: ${h.produzidas}`;
       hist.appendChild(d);
     });
 
@@ -201,27 +205,53 @@ function render(){
     };
 
     // =============================
-    // LISTA DE ESPERA COM COR
+    // LISTA DE ESPERA (ARRASTAR + EXCLUIR)
     // =============================
     const futureList=q('[data-role="futureList"]');
-    const priorityColor={
-      vermelho:'#7f1d1d',
-      amarelo:'#78350f',
-      verde:'#14532d'
-    };
+    const colors={vermelho:'#7f1d1d',amarelo:'#78350f',verde:'#14532d'};
 
     function renderFuture(){
       futureList.innerHTML='';
-      m.future.forEach(f=>{
+      m.future.forEach((f,idx)=>{
         const d=document.createElement('div');
-        d.textContent=f.item;
-        d.style.backgroundColor=priorityColor[f.priority];
+        d.style.display='flex';
+        d.style.justifyContent='space-between';
+        d.style.alignItems='center';
+        d.style.backgroundColor=colors[f.priority];
         d.style.padding='4px 6px';
         d.style.borderRadius='4px';
+
+        const txt=document.createElement('span');
+        txt.textContent=f.item;
+
+        const del=document.createElement('span');
+        del.textContent='✖';
+        del.style.cursor='pointer';
+        del.onclick=()=>{
+          m.future.splice(idx,1);
+          salvarMaquina(m);
+          render();
+        };
+
+        d.appendChild(txt);
+        d.appendChild(del);
         futureList.appendChild(d);
       });
-    }
 
+      Sortable.create(futureList,{
+        animation:150,
+        onEnd:()=>{
+          const nova=[];
+          [...futureList.children].forEach(el=>{
+            const txt=el.querySelector('span').textContent;
+            const item=m.future.find(f=>f.item===txt);
+            if(item) nova.push(item);
+          });
+          m.future=nova;
+          salvarMaquina(m);
+        }
+      });
+    }
     renderFuture();
 
     q('[data-role="addFuture"]').onclick=()=>{
@@ -231,7 +261,7 @@ function render(){
       m.future.push({item:v,priority:p});
       salvarMaquina(m);
       q('[data-role="futureInput"]').value='';
-      renderFuture();
+      render();
     };
 
     container.appendChild(root);
