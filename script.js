@@ -1,10 +1,20 @@
 // =============================
-// FIREBASE INIT
+// CONFIGURAÇÕES
+// =============================
+const MACHINE_NAMES = [
+  'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
+  'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
+  '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
+];
+
+let state = { machines: [] };
+
+// =============================
+// FIREBASE
 // =============================
 firebase.initializeApp({
   apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
   authDomain: "dashboardusinagem.firebaseapp.com",
-  databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com",
   projectId: "dashboardusinagem",
   storageBucket: "dashboardusinagem.appspot.com",
   messagingSenderId: "677023128312",
@@ -12,162 +22,159 @@ firebase.initializeApp({
 });
 
 const db = firebase.database();
-const REF = db.ref("usinagem_dashboard_v18_6");
+const REF = db.ref('usinagem_dashboard_v18_6');
 
 // =============================
-// CONFIG
+// UTILIDADES
 // =============================
-const MACHINE_NAMES = [
-  "Fresa CNC 1","Fresa CNC 2","Fresa CNC 3",
-  "Robodrill 1","Robodrill 2","Torno CNC 1",
-  "Torno CNC 2","Centro Usinagem 1"
-];
-
-// =============================
-// STATE
-// =============================
-let machines = {};
-
-// =============================
-// UTILS
-// =============================
-function parseMinutes(v) {
+function parseMin(v) {
   if (!v) return 0;
-  if (v.includes(":")) {
-    const p = v.split(":").map(Number);
-    return p.length === 3 ? p[0]*60 + p[1] + p[2]/60 : 0;
+  if (v.includes(':')) {
+    const [m, s = 0] = v.split(':').map(Number);
+    return m + s / 60;
   }
-  return parseFloat(v) || 0;
+  return Number(v.replace(',', '.')) || 0;
+}
+
+function calcularPrevisto(ciclo) {
+  if (!ciclo) return 0;
+  return Math.floor(525 / ciclo);
+}
+
+function prioridadeCor(p) {
+  if (p === 'vermelho') return 'bg-red-600';
+  if (p === 'amarelo') return 'bg-yellow-500';
+  return 'bg-green-600';
 }
 
 // =============================
 // RENDER
 // =============================
 function render() {
-  const container = document.getElementById("machinesContainer");
-  if (!container) return;
-  container.innerHTML = "";
+  const container = document.getElementById('machinesContainer');
+  container.innerHTML = '';
 
-  MACHINE_NAMES.forEach(name => {
-    const data = machines[name] || { history: [], future: [] };
-    const tpl = document.getElementById("machine-template");
-    const card = tpl.content.cloneNode(true);
-
-    const root = card.firstElementChild;
-
+  state.machines.forEach(m => {
+    const tpl = document.getElementById('machine-template');
+    const root = tpl.content.cloneNode(true).firstElementChild;
     const $ = r => root.querySelector(`[data-role="${r}"]`);
 
-    $("title").textContent = name;
-    $("predicted").textContent = data.predicted || 0;
+    // ===== DADOS =====
+    $('title').textContent = m.id;
+    $('operator').value = m.operator || '';
+    $('process').value = m.process || '';
+    $('cycle').value = m.cycle || '';
+    $('produced').value = m.produced ?? '';
+    $('observacao').value = m.observacao || '';
+    $('predicted').textContent = m.predicted || 0;
 
-    $("history").innerHTML = (data.history || []).map(h => `<div>${h}</div>`).join("");
+    // ===== HISTÓRICO =====
+    const historyBox = $('history');
+    historyBox.innerHTML = '';
 
-    // ===== BOTÕES =====
-    $("save").onclick = () => {
-      const cycle = parseMinutes($("cycle").value);
-      const troca = parseMinutes($("troca").value);
-      const setup = parseMinutes($("setup").value);
-      const produced = parseInt($("produced").value || 0);
+    (m.history || []).forEach(h => {
+      const div = document.createElement('div');
+      div.className = 'border-b border-gray-700 pb-1 mb-1';
+      div.innerHTML = `
+        <div><b>${h.data}</b></div>
+        <div>${h.processo}</div>
+        <div>${h.produzidas} peças — <b>${h.eficiencia}%</b></div>
+        ${h.obs ? `<div>📝 ${h.obs}</div>` : ''}
+      `;
+      historyBox.appendChild(div);
+    });
 
-      const available = Math.max(0, 480 - setup - troca);
-      const predicted = cycle > 0 ? Math.floor(available / cycle) : 0;
-      const efficiency = predicted ? Math.round((produced / predicted) * 100) : 0;
-
-      machines[name] = {
-        ...data,
-        predicted,
-        efficiency
-      };
-
-      REF.child(name).set(machines[name]);
+    // ===== EVENTOS =====
+    $('save').onclick = () => {
+      m.operator = $('operator').value.trim();
+      m.process = $('process').value.trim();
+      m.cycle = parseMin($('cycle').value);
+      m.produced = Number($('produced').value) || 0;
+      m.observacao = $('observacao').value.trim();
+      m.predicted = calcularPrevisto(m.cycle);
+      salvar(m);
     };
 
-    $("addHistory").onclick = () => {
-      const now = new Date().toLocaleString("pt-BR");
-      const text =
-        `${now} | Operador: ${$("operator").value} | Peça: ${$("process").value} | ` +
-        `Previsto: ${data.predicted || 0} | Realizado: ${$("produced").value} | ` +
-        `Eficiência: ${data.efficiency || 0}% | Obs.: ${$("observacao").value}`;
+    $('addHistory').onclick = () => {
+      if (!m.history) m.history = [];
 
-      data.history = data.history || [];
-      data.history.push(text);
+      const eficiencia = m.predicted > 0
+        ? ((m.produced / m.predicted) * 100).toFixed(1)
+        : '0.0';
 
-      REF.child(name).child("history").set(data.history);
-    };
-
-    $("clearHistory").onclick = () => {
-      if (!confirm("Limpar histórico?")) return;
-      data.history = [];
-      REF.child(name).child("history").set([]);
-    };
-
-    // ===== FUTURO =====
-    $("addFuture").onclick = () => {
-      const txt = $("futureInput").value.trim();
-      if (!txt) return;
-
-      data.future = data.future || [];
-      data.future.push({
-        text: txt,
-        priority: $("prioritySelect").value
+      m.history.unshift({
+        processo: m.process,
+        produzidas: m.produced,
+        eficiencia,
+        obs: m.observacao || '',
+        data: new Date().toLocaleString()
       });
 
-      $("futureInput").value = "";
-      REF.child(name).child("future").set(data.future);
+      salvar(m);
     };
 
-    $("sortFuture").onclick = () => {
-      const order = { vermelho: 0, amarelo: 1, verde: 2 };
-      data.future.sort((a, b) => order[a.priority] - order[b.priority]);
-      REF.child(name).child("future").set(data.future);
+    $('clearHistory').onclick = () => {
+      if (!m.history || m.history.length === 0) return;
+      m.history = [];
+      salvar(m);
     };
 
-    const futureList = $("futureList");
-    futureList.innerHTML = "";
-    (data.future || []).forEach(f => {
-      const div = document.createElement("div");
-      div.textContent = f.text;
-      div.className = "px-2 py-1 rounded bg-gray-700 text-sm";
+    // ===== LISTA DE ESPERA =====
+    const futureList = $('futureList');
+    futureList.innerHTML = '';
+
+    (m.future || []).forEach((f, i) => {
+      const div = document.createElement('div');
+      div.className = `flex justify-between items-center px-2 py-1 rounded text-sm ${prioridadeCor(f.priority)}`;
+      div.innerHTML = `
+        <span>${f.item}</span>
+        <button class="text-white font-bold">✕</button>
+      `;
+      div.querySelector('button').onclick = () => {
+        m.future.splice(i, 1);
+        salvar(m);
+      };
       futureList.appendChild(div);
     });
 
-    container.appendChild(card);
+    new Sortable(futureList, {
+      animation: 150,
+      onEnd: e => {
+        const [item] = m.future.splice(e.oldIndex, 1);
+        m.future.splice(e.newIndex, 0, item);
+        salvar(m);
+      }
+    });
+
+    $('addFuture').onclick = () => {
+      const val = $('futureInput').value.trim();
+      const prio = $('prioritySelect').value;
+      if (!val) return;
+      if (!m.future) m.future = [];
+      m.future.push({ item: val, priority: prio });
+      $('futureInput').value = '';
+      salvar(m);
+    };
+
+    // ===== INSERE CARD =====
+    container.appendChild(root);
   });
 }
 
 // =============================
-// FIREBASE LISTENER
+// FIREBASE
 // =============================
-REF.on("value", snap => {
-  machines = snap.val() || {};
+function salvar(m) {
+  REF.child(m.id).set(m);
+}
+
+REF.on('value', snap => {
+  const data = snap.val() || {};
+  state.machines = MACHINE_NAMES.map(id => ({
+    id,
+    ...data[id],
+    history: data[id]?.history || [],
+    future: data[id]?.future || []
+  }));
   render();
-});
-
-// =============================
-// HEADER BUTTONS (SAFE)
-// =============================
-document.addEventListener("DOMContentLoaded", () => {
-  const exportBtn = document.getElementById("exportAll");
-  const resetBtn = document.getElementById("resetAll");
-
-  if (exportBtn) {
-    exportBtn.onclick = () => {
-      let csv = "Máquina,Histórico\n";
-      Object.entries(machines).forEach(([k, v]) => {
-        (v.history || []).forEach(h => csv += `"${k}","${h}"\n`);
-      });
-
-      const blob = new Blob([csv], { type: "text/csv" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "historico_usinagem.csv";
-      a.click();
-    };
-  }
-
-  if (resetBtn) {
-    resetBtn.onclick = () => {
-      if (confirm("Resetar tudo?")) REF.remove();
-    };
-  }
 });
