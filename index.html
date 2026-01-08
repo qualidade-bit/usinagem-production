@@ -20,21 +20,18 @@
 
   <!-- CSS externo -->
   <link rel="stylesheet" href="style.css" />
+
   <script>
-// ==========================================================
-// SOLICITAR PERMISSÃO DE NOTIFICAÇÃO
-// ==========================================================
-document.addEventListener("DOMContentLoaded", () => {
-  if ("Notification" in window) {
-    if (Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }
-});
-</script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    });
+  </script>
 </head>
 
 <body class="bg-gray-900 text-gray-100">
+
 <header class="p-4 border-b border-gray-800">
   <h1 class="text-xl font-bold">Diário de produção — Usinagem Dia (v18.6)</h1>
   <div class="mt-2 flex gap-2">
@@ -53,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
   Versão v18.6 — Agora com lista de espera editável e reordenável por prioridade ou arrasto manual.
 </footer>
 
-<!-- Template -->
+<!-- TEMPLATE -->
 <template id="machine-template">
   <div class="p-4 bg-gray-800 rounded shadow">
     <div class="flex justify-between items-start gap-2">
@@ -71,12 +68,12 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="flex flex-col gap-2">
         <input data-role="operator" placeholder="Operador" class="px-2 py-1 rounded bg-gray-700 text-sm" />
         <input data-role="process" placeholder="Processo / Peça" class="px-2 py-1 rounded bg-gray-700 text-sm" />
-        <input data-role="cycle" placeholder="Tempo de ciclo (hh:mm:ss ou min decimal)" class="px-2 py-1 rounded bg-gray-700 text-sm" />
-        <input data-role="troca" placeholder="Tempo de troca (hh:mm:ss ou min decimal)" class="px-2 py-1 rounded bg-gray-700 text-sm" />
-        <input data-role="setup" placeholder="Tempo parada (min)" class="px-2 py-1 rounded bg-gray-700 text-sm" />
+        <input data-role="cycle" placeholder="Tempo de ciclo" class="px-2 py-1 rounded bg-gray-700 text-sm" />
+        <input data-role="troca" placeholder="Tempo de troca" class="px-2 py-1 rounded bg-gray-700 text-sm" />
+        <input data-role="setup" placeholder="Tempo parada" class="px-2 py-1 rounded bg-gray-700 text-sm" />
         <input data-role="startTime" type="time" class="px-2 py-1 rounded bg-gray-700 text-sm" />
         <input data-role="endTime" type="time" class="px-2 py-1 rounded bg-gray-700 text-sm" />
-        <input data-role="produced" placeholder="Peças realizadas (inteiro)" class="px-2 py-1 rounded bg-gray-700 text-sm" />
+        <input data-role="produced" placeholder="Peças realizadas" class="px-2 py-1 rounded bg-gray-700 text-sm" />
         <input data-role="observacao" placeholder="Observação" class="px-2 py-1 rounded bg-gray-700 text-sm" />
       </div>
 
@@ -90,18 +87,17 @@ document.addEventListener("DOMContentLoaded", () => {
       <div data-role="performance" class="text-center text-sm font-semibold mt-1"></div>
       <div class="max-h-40 overflow-auto bg-gray-900/30 p-2 rounded text-sm" data-role="history"></div>
 
-      <!-- Lista de espera -->
       <div class="mt-4">
         <h3 class="font-semibold text-sm mb-1">🕒 Processos Futuros</h3>
         <div class="flex gap-2 mb-2">
-          <input data-role="futureInput" placeholder="Novo processo futuro" class="flex-1 px-2 py-1 rounded bg-gray-700 text-sm" />
+          <input data-role="futureInput" class="flex-1 px-2 py-1 rounded bg-gray-700 text-sm" />
           <select data-role="prioritySelect" class="px-2 py-1 rounded bg-gray-700 text-sm">
             <option value="vermelho">🔴 Urgente</option>
             <option value="amarelo">🟡 Alta</option>
             <option value="verde">🟢 Normal</option>
           </select>
           <button data-role="addFuture" class="px-2 py-1 bg-blue-600 rounded text-sm">Adicionar</button>
-          <button data-role="sortFuture" class="px-2 py-1 bg-gray-600 rounded text-sm sort-btn">Ordenar</button>
+          <button data-role="sortFuture" class="px-2 py-1 bg-gray-600 rounded text-sm">Ordenar</button>
         </div>
 
         <div data-role="futureList" class="space-y-1"></div>
@@ -110,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
 </template>
 
-<!-- JS externo -->
+<!-- JS -->
 <script src="script.js"></script>
 
 </body>
