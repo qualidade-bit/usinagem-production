@@ -1,19 +1,10 @@
 // =============================
-// CONFIGURAÇÕES INICIAIS
-// =============================
-
-const MACHINE_NAMES = [
- 'Fresa CNC 1','Fresa CNC 2','Fresa CNC 3','Robodrill 2','D 800-1','Fagor',
- 'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
- '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
-];
-
-// =============================
-// FIREBASE
+// FIREBASE INIT
 // =============================
 firebase.initializeApp({
   apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
   authDomain: "dashboardusinagem.firebaseapp.com",
+  databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com",
   projectId: "dashboardusinagem",
   storageBucket: "dashboardusinagem.appspot.com",
   messagingSenderId: "677023128312",
@@ -21,176 +12,162 @@ firebase.initializeApp({
 });
 
 const db = firebase.database();
-const REF = db.ref('usinagem_dashboard_v18_6');
+const REF = db.ref("usinagem_dashboard_v18_6");
 
 // =============================
-// NOTIFICAÇÃO
+// CONFIG
 // =============================
-function notificar(titulo, mensagem) {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "granted") {
-    new Notification(titulo, { body: mensagem });
+const MACHINE_NAMES = [
+  "Fresa CNC 1","Fresa CNC 2","Fresa CNC 3",
+  "Robodrill 1","Robodrill 2","Torno CNC 1",
+  "Torno CNC 2","Centro Usinagem 1"
+];
+
+// =============================
+// STATE
+// =============================
+let machines = {};
+
+// =============================
+// UTILS
+// =============================
+function parseMinutes(v) {
+  if (!v) return 0;
+  if (v.includes(":")) {
+    const p = v.split(":").map(Number);
+    return p.length === 3 ? p[0]*60 + p[1] + p[2]/60 : 0;
   }
-}
-
-// =============================
-// FUNÇÕES DE TEMPO
-// =============================
-function parseTempoMinutos(str) {
-  if (!str) return 0;
-  const s = String(str).trim();
-  if (s.includes(':')) {
-    const p = s.split(':').map(Number);
-    if (p.length === 3) return p[0]*60 + p[1] + p[2]/60;
-    if (p.length === 2) return p[0] + p[1]/60;
-  }
-  const v = Number(s.replace(',', '.'));
-  return isNaN(v) ? 0 : v;
-}
-
-function formatMinutesToMMSS(min) {
-  if (!min) return '-';
-  const s = Math.round(min * 60);
-  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-}
-
-function minutosDisponiveis(start, end) {
-  if (!start || !end) return 0;
-  const toMin = t => {
-    const p = t.split(':').map(Number);
-    return p[0]*60 + (p[1]||0);
-  };
-  let diff = toMin(end) - toMin(start);
-  if (diff <= 0) return 0;
-  if (toMin(end) > 720 && toMin(start) < 780) diff -= 60;
-  return Math.max(diff,0);
-}
-
-function calcularPrevisto(ciclo, troca, setup, start, end) {
-  const disp = minutosDisponiveis(start,end) - (setup||0);
-  if (disp <= 0 || ciclo <= 0) return 0;
-  return Math.floor(disp / (ciclo + (troca||0)));
-}
-
-// =============================
-// ESTADO
-// =============================
-let state = { machines: [] };
-
-function initDefaultMachines() {
-  return MACHINE_NAMES.map(n => ({
-    id:n, operator:'', process:'', cycleMin:null, trocaMin:null,
-    setupMin:0, observacao:'', startTime:'07:00', endTime:'16:45',
-    produced:null, predicted:0, history:[], future:[]
-  }));
+  return parseFloat(v) || 0;
 }
 
 // =============================
 // RENDER
 // =============================
 function render() {
-  const container = document.getElementById('machinesContainer');
-  container.innerHTML = '';
+  const container = document.getElementById("machinesContainer");
+  if (!container) return;
+  container.innerHTML = "";
 
-  state.machines.forEach(m => {
-    const tpl = document.getElementById('machine-template');
-    const node = tpl.content.cloneNode(true);
-    const root = node.querySelector('div');
+  MACHINE_NAMES.forEach(name => {
+    const data = machines[name] || { history: [], future: [] };
+    const tpl = document.getElementById("machine-template");
+    const card = tpl.content.cloneNode(true);
 
-    const $ = r => node.querySelector(r);
+    const root = card.firstElementChild;
 
-    $('[data-role="title"]').textContent = m.id;
-    $('[data-role="subtitle"]').textContent =
-      `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
+    const $ = r => root.querySelector(`[data-role="${r}"]`);
 
-    $('[data-role="operator"]').value = m.operator;
-    $('[data-role="process"]').value = m.process;
-    $('[data-role="cycle"]').value = m.cycleMin?formatMinutesToMMSS(m.cycleMin):'';
-    $('[data-role="troca"]').value = m.trocaMin?formatMinutesToMMSS(m.trocaMin):'';
-    $('[data-role="setup"]').value = m.setupMin||'';
-    $('[data-role="startTime"]').value = m.startTime;
-    $('[data-role="endTime"]').value = m.endTime;
-    $('[data-role="produced"]').value = m.produced ?? '';
-    $('[data-role="observacao"]').value = m.observacao;
-    $('[data-role="predicted"]').textContent = m.predicted||0;
+    $("title").textContent = name;
+    $("predicted").textContent = data.predicted || 0;
 
-    container.appendChild(root);
+    $("history").innerHTML = (data.history || []).map(h => `<div>${h}</div>`).join("");
 
-    const ctx = root.querySelector('[data-role="chart"]').getContext('2d');
-    const chart = new Chart(ctx,{
-      type:'bar',
-      data:{labels:['Previsto','Realizado'],
-        datasets:[{data:[m.predicted||0,m.produced||0],
-        backgroundColor:['#22c55e','#94a3b8']}]},
-      options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+    // ===== BOTÕES =====
+    $("save").onclick = () => {
+      const cycle = parseMinutes($("cycle").value);
+      const troca = parseMinutes($("troca").value);
+      const setup = parseMinutes($("setup").value);
+      const produced = parseInt($("produced").value || 0);
+
+      const available = Math.max(0, 480 - setup - troca);
+      const predicted = cycle > 0 ? Math.floor(available / cycle) : 0;
+      const efficiency = predicted ? Math.round((produced / predicted) * 100) : 0;
+
+      machines[name] = {
+        ...data,
+        predicted,
+        efficiency
+      };
+
+      REF.child(name).set(machines[name]);
+    };
+
+    $("addHistory").onclick = () => {
+      const now = new Date().toLocaleString("pt-BR");
+      const text =
+        `${now} | Operador: ${$("operator").value} | Peça: ${$("process").value} | ` +
+        `Previsto: ${data.predicted || 0} | Realizado: ${$("produced").value} | ` +
+        `Eficiência: ${data.efficiency || 0}% | Obs.: ${$("observacao").value}`;
+
+      data.history = data.history || [];
+      data.history.push(text);
+
+      REF.child(name).child("history").set(data.history);
+    };
+
+    $("clearHistory").onclick = () => {
+      if (!confirm("Limpar histórico?")) return;
+      data.history = [];
+      REF.child(name).child("history").set([]);
+    };
+
+    // ===== FUTURO =====
+    $("addFuture").onclick = () => {
+      const txt = $("futureInput").value.trim();
+      if (!txt) return;
+
+      data.future = data.future || [];
+      data.future.push({
+        text: txt,
+        priority: $("prioritySelect").value
+      });
+
+      $("futureInput").value = "";
+      REF.child(name).child("future").set(data.future);
+    };
+
+    $("sortFuture").onclick = () => {
+      const order = { vermelho: 0, amarelo: 1, verde: 2 };
+      data.future.sort((a, b) => order[a.priority] - order[b.priority]);
+      REF.child(name).child("future").set(data.future);
+    };
+
+    const futureList = $("futureList");
+    futureList.innerHTML = "";
+    (data.future || []).forEach(f => {
+      const div = document.createElement("div");
+      div.textContent = f.text;
+      div.className = "px-2 py-1 rounded bg-gray-700 text-sm";
+      futureList.appendChild(div);
     });
 
-    function atualizarGrafico() {
-      chart.data.datasets[0].data = [m.predicted||0, m.produced||0];
-      chart.update();
-    }
-
-    // SALVAR
-    $('[data-role="save"]').onclick = () => {
-      m.operator = $('[data-role="operator"]').value;
-      m.process = $('[data-role="process"]').value;
-      m.cycleMin = parseTempoMinutos($('[data-role="cycle"]').value);
-      m.trocaMin = parseTempoMinutos($('[data-role="troca"]').value);
-      m.setupMin = parseTempoMinutos($('[data-role="setup"]').value);
-      m.startTime = $('[data-role="startTime"]').value;
-      m.endTime = $('[data-role="endTime"]').value;
-      m.produced = Number($('[data-role="produced"]').value)||null;
-      m.observacao = $('[data-role="observacao"]').value;
-
-      m.predicted = calcularPrevisto(
-        m.cycleMin,m.trocaMin,m.setupMin,m.startTime,m.endTime
-      );
-
-      REF.child(m.id).set(m);
-      atualizarGrafico();
-      notificar('Salvo', m.id);
-    };
+    container.appendChild(card);
   });
 }
 
 // =============================
 // FIREBASE LISTENER
 // =============================
-REF.on('value', snap => {
-  const data = snap.val();
-  state.machines = data
-    ? MACHINE_NAMES.map(n => ({...initDefaultMachines()[0],...data[n],id:n}))
-    : initDefaultMachines();
+REF.on("value", snap => {
+  machines = snap.val() || {};
   render();
 });
 
 // =============================
-// EXPORTAR CSV
+// HEADER BUTTONS (SAFE)
 // =============================
-function exportCSV() {
-  const lines = ['Maquina,Operador,Processo,Previsto,Realizado'];
-  state.machines.forEach(m=>{
-    lines.push(`${m.id},${m.operator},${m.process},${m.predicted||0},${m.produced||''}`);
-  });
-  const blob = new Blob([lines.join('\n')],{type:'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'usinagem.csv';
-  a.click();
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const exportBtn = document.getElementById("exportAll");
+  const resetBtn = document.getElementById("resetAll");
 
-// =============================
-// RESET
-// =============================
-function resetAll() {
-  if (!confirm('Resetar tudo?')) return;
-  state.machines.forEach(m=>REF.child(m.id).set(initDefaultMachines().find(x=>x.id===m.id)));
-}
+  if (exportBtn) {
+    exportBtn.onclick = () => {
+      let csv = "Máquina,Histórico\n";
+      Object.entries(machines).forEach(([k, v]) => {
+        (v.history || []).forEach(h => csv += `"${k}","${h}"\n`);
+      });
 
-// =============================
-// BOTÕES HEADER
-// =============================
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('exportAll').onclick = exportCSV;
-  document.getElementById('resetAll').onclick = resetAll;
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "historico_usinagem.csv";
+      a.click();
+    };
+  }
+
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      if (confirm("Resetar tudo?")) REF.remove();
+    };
+  }
 });
