@@ -1,5 +1,5 @@
 // =============================
-//  CONFIGURAÇÕES INICIAIS E FIREBASE
+// CONFIGURAÇÕES INICIAIS
 // =============================
 
 const MACHINE_NAMES = [
@@ -9,12 +9,11 @@ const MACHINE_NAMES = [
 ];
 
 // =============================
-// FIREBASE NOVO — REALTIME DATABASE
+// FIREBASE
 // =============================
 firebase.initializeApp({
   apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
   authDomain: "dashboardusinagem.firebaseapp.com",
-  databaseURL: "https://dashboardusinagem-default-rtdb.firebaseio.com", // <- importante
   projectId: "dashboardusinagem",
   storageBucket: "dashboardusinagem.appspot.com",
   messagingSenderId: "677023128312",
@@ -24,209 +23,174 @@ firebase.initializeApp({
 const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
 
-// ==========================================================
-// FUNÇÃO DE NOTIFICAÇÃO
-// ==========================================================
+// =============================
+// NOTIFICAÇÃO
+// =============================
 function notificar(titulo, mensagem) {
-  if (!("Notification" in window)) {
-    console.log("Navegador não suporta notificações.");
-    return;
-  }
+  if (!("Notification" in window)) return;
   if (Notification.permission === "granted") {
-    new Notification(titulo, {
-      body: mensagem,
-      icon: "https://cdn-icons-png.flaticon.com/512/1827/1827272.png"
-    }); 
+    new Notification(titulo, { body: mensagem });
   }
 }
 
-// =========================================================
-// FUNÇÕES DE TEMPO E CÁLCULO DE PRODUÇÃO
-// ==========================================================
+// =============================
+// FUNÇÕES DE TEMPO
+// =============================
 function parseTempoMinutos(str) {
- if (!str) return 0;
- const s = String(str).trim();
- if (s.includes(':')) {
-   const parts = s.split(':').map(Number);
-   if (parts.length === 3) return parts[0]*60 + parts[1] + parts[2]/60;
-   if (parts.length === 2) return parts[0] + parts[1]/60;
- }
- const v = Number(s.replace(',', '.'));
- return isNaN(v) ? 0 : v;
+  if (!str) return 0;
+  const s = String(str).trim();
+  if (s.includes(':')) {
+    const p = s.split(':').map(Number);
+    if (p.length === 3) return p[0]*60 + p[1] + p[2]/60;
+    if (p.length === 2) return p[0] + p[1]/60;
+  }
+  const v = Number(s.replace(',', '.'));
+  return isNaN(v) ? 0 : v;
 }
 
-function formatMinutesToMMSS(minFloat) {
- if (!minFloat || isNaN(minFloat)) return '-';
- const totalSeconds = Math.round(minFloat * 60);
- const m = Math.floor(totalSeconds / 60);
- const s = totalSeconds % 60;
- return `${m}:${String(s).padStart(2,'0')}`;
+function formatMinutesToMMSS(min) {
+  if (!min) return '-';
+  const s = Math.round(min * 60);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 }
 
-function minutosDisponiveis(startStr, endStr) {
- if (!startStr || !endStr) return 0;
- function toMinutes(timeStr) {
-   const parts = timeStr.split(':').map(Number);
-   if (parts.length===3) return parts[0]*60 + parts[1] + parts[2]/60;
-   if (parts.length===2) return parts[0]*60 + parts[1];
-   if (parts.length===1) return parts[0]*60;
-   return 0;
- }
- const start = toMinutes(startStr);
- const end = toMinutes(endStr);
- let diff = end-start;
- if (diff < 0) return 0;
- const lunchStart = toMinutes('12:00');
- const lunchEnd = toMinutes('13:00');
- if (end > lunchStart && start < lunchEnd) {
-   const overlap = Math.min(end, lunchEnd) - Math.max(start, lunchStart);
-   if (overlap>0) diff-=overlap;
- }
- return Math.max(diff,0);
+function minutosDisponiveis(start, end) {
+  if (!start || !end) return 0;
+  const toMin = t => {
+    const p = t.split(':').map(Number);
+    return p[0]*60 + (p[1]||0);
+  };
+  let diff = toMin(end) - toMin(start);
+  if (diff <= 0) return 0;
+  if (toMin(end) > 720 && toMin(start) < 780) diff -= 60;
+  return Math.max(diff,0);
 }
 
-function calcularPrevisto(cycleMin, trocaMin, setupMin, startStr, endStr) {
- const totalDisponivel = Math.max(minutosDisponiveis(startStr,endStr)-(setupMin||0),0);
- if (!cycleMin || cycleMin<=0 || totalDisponivel<=0) return 0;
- const cicloTotal = cycleMin+(trocaMin||0);
- if (cicloTotal<=0) return 0;
- return Math.floor(totalDisponivel/cicloTotal);
+function calcularPrevisto(ciclo, troca, setup, start, end) {
+  const disp = minutosDisponiveis(start,end) - (setup||0);
+  if (disp <= 0 || ciclo <= 0) return 0;
+  return Math.floor(disp / (ciclo + (troca||0)));
 }
 
-// Estado global
+// =============================
+// ESTADO
+// =============================
 let state = { machines: [] };
 
 function initDefaultMachines() {
- return MACHINE_NAMES.map(name => ({
-   id: name,
-   operator: '',
-   process: '',
-   cycleMin: null,
-   setupMin: 0,
-   trocaMin: null,
-   observacao: '',
-   startTime: '07:00',
-   endTime: '16:45',
-   produced: null,
-   predicted: 0,
-   history: [],
-   future: []
- }));
+  return MACHINE_NAMES.map(n => ({
+    id:n, operator:'', process:'', cycleMin:null, trocaMin:null,
+    setupMin:0, observacao:'', startTime:'07:00', endTime:'16:45',
+    produced:null, predicted:0, history:[], future:[]
+  }));
 }
 
-function ensureFutureArray(machine) {
- if (!machine) return;
- if (!Array.isArray(machine.future)) machine.future = [];
-}
-
-// =========================================================
-// RENDER DASHBOARD
-// ==========================================================
+// =============================
+// RENDER
+// =============================
 function render() {
- const container = document.getElementById('machinesContainer');
- container.innerHTML = '';
+  const container = document.getElementById('machinesContainer');
+  container.innerHTML = '';
 
- state.machines.forEach(m => {
-   ensureFutureArray(m);
+  state.machines.forEach(m => {
+    const tpl = document.getElementById('machine-template');
+    const node = tpl.content.cloneNode(true);
+    const root = node.querySelector('div');
 
-   const tpl = document.getElementById('machine-template');
-   const node = tpl.content.cloneNode(true);
-   const root = node.querySelector('div');
+    const $ = r => node.querySelector(r);
 
-   const title = node.querySelector('[data-role="title"]');
-   const subtitle = node.querySelector('[data-role="subtitle"]');
-   const operatorInput = node.querySelector('[data-role="operator"]');
-   const processInput = node.querySelector('[data-role="process"]');
-   const cycleInput = node.querySelector('[data-role="cycle"]');
-   const trocaInput = node.querySelector('[data-role="troca"]');
-   const setupInput = node.querySelector('[data-role="setup"]');
-   const observacaoInput = node.querySelector('[data-role="observacao"]');
-   const startInput = node.querySelector('[data-role="startTime"]');
-   const endInput = node.querySelector('[data-role="endTime"]');
-   const producedInput = node.querySelector('[data-role="produced"]');
-   const saveBtn = node.querySelector('[data-role="save"]');
-   const addHistBtn = node.querySelector('[data-role="addHistory"]');
-   const clearHistBtn = node.querySelector('[data-role="clearHistory"]');
-   const predictedEl = node.querySelector('[data-role="predicted"]');
-   const historyEl = node.querySelector('[data-role="history"]');
-   const performanceEl = node.querySelector('[data-role="performance"]');
-   const futureInput = node.querySelector('[data-role="futureInput"]');
-   const addFutureBtn = node.querySelector('[data-role="addFuture"]');
-   const futureList = node.querySelector('[data-role="futureList"]');
-   const prioritySelect = node.querySelector('[data-role="prioritySelect"]');
-   const sortFutureBtn = node.querySelector('[data-role="sortFuture"]');
+    $('[data-role="title"]').textContent = m.id;
+    $('[data-role="subtitle"]').textContent =
+      `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
 
-   title.textContent = m.id;
-   subtitle.textContent = `Operador: ${m.operator||'-'} · Ciclo: ${m.cycleMin!=null?formatMinutesToMMSS(m.cycleMin):'-'} · Peça: ${m.process||'-'}`;
-   operatorInput.value = m.operator;
-   processInput.value = m.process;
-   cycleInput.value = m.cycleMin!=null?formatMinutesToMMSS(m.cycleMin):'';
-   trocaInput.value = m.trocaMin!=null?formatMinutesToMMSS(m.trocaMin):'';
-   setupInput.value = m.setupMin!=null?formatMinutesToMMSS(m.setupMin):'';
-   observacaoInput.value = m.observacao||'';
-   startInput.value = m.startTime;
-   endInput.value = m.endTime;
-   producedInput.value = m.produced!=null?m.produced:'';
-   predictedEl.textContent = m.predicted ?? 0;
+    $('[data-role="operator"]').value = m.operator;
+    $('[data-role="process"]').value = m.process;
+    $('[data-role="cycle"]').value = m.cycleMin?formatMinutesToMMSS(m.cycleMin):'';
+    $('[data-role="troca"]').value = m.trocaMin?formatMinutesToMMSS(m.trocaMin):'';
+    $('[data-role="setup"]').value = m.setupMin||'';
+    $('[data-role="startTime"]').value = m.startTime;
+    $('[data-role="endTime"]').value = m.endTime;
+    $('[data-role="produced"]').value = m.produced ?? '';
+    $('[data-role="observacao"]').value = m.observacao;
+    $('[data-role="predicted"]').textContent = m.predicted||0;
 
-   container.appendChild(root);
+    container.appendChild(root);
 
-   // ======= Resto do seu código original =======
-   // Gráficos, histórico, future list, botões etc.
-   // Todas as funções internas mantidas idênticas
-   // ...
- });
+    const ctx = root.querySelector('[data-role="chart"]').getContext('2d');
+    const chart = new Chart(ctx,{
+      type:'bar',
+      data:{labels:['Previsto','Realizado'],
+        datasets:[{data:[m.predicted||0,m.produced||0],
+        backgroundColor:['#22c55e','#94a3b8']}]},
+      options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+    });
+
+    function atualizarGrafico() {
+      chart.data.datasets[0].data = [m.predicted||0, m.produced||0];
+      chart.update();
+    }
+
+    // SALVAR
+    $('[data-role="save"]').onclick = () => {
+      m.operator = $('[data-role="operator"]').value;
+      m.process = $('[data-role="process"]').value;
+      m.cycleMin = parseTempoMinutos($('[data-role="cycle"]').value);
+      m.trocaMin = parseTempoMinutos($('[data-role="troca"]').value);
+      m.setupMin = parseTempoMinutos($('[data-role="setup"]').value);
+      m.startTime = $('[data-role="startTime"]').value;
+      m.endTime = $('[data-role="endTime"]').value;
+      m.produced = Number($('[data-role="produced"]').value)||null;
+      m.observacao = $('[data-role="observacao"]').value;
+
+      m.predicted = calcularPrevisto(
+        m.cycleMin,m.trocaMin,m.setupMin,m.startTime,m.endTime
+      );
+
+      REF.child(m.id).set(m);
+      atualizarGrafico();
+      notificar('Salvo', m.id);
+    };
+  });
 }
 
-// =========================================================
+// =============================
 // FIREBASE LISTENER
-// ==========================================================
-REF.on('value', snapshot => {
- const data = snapshot.val();
-
- if (!data) {
-   state.machines = initDefaultMachines();
-   state.machines.forEach(m => REF.child(m.id).set(m));
- } else {
-   state.machines = MACHINE_NAMES.map(name => {
-     const raw = data[name] || {};
-     if (!Array.isArray(raw.future)) raw.future=[];
-     if (!Array.isArray(raw.history)) raw.history=[];
-     return {
-       id: name,
-       operator: raw.operator||'',
-       process: raw.process||'',
-       cycleMin: raw.cycleMin!=null?raw.cycleMin:null,
-       setupMin: raw.setupMin!=null?raw.setupMin:0,
-       trocaMin: raw.trocaMin!=null?raw.trocaMin:null,
-       observacao: raw.observacao||'',
-       startTime: raw.startTime||'07:00',
-       endTime: raw.endTime||'16:45',
-       produced: raw.produced!=null?raw.produced:null,
-       predicted: raw.predicted!=null?raw.predicted:0,
-       history: Array.isArray(raw.history)?raw.history:[],
-       future: Array.isArray(raw.future)?raw.future:[]
-     };
-   });
- }
-
- render();
+// =============================
+REF.on('value', snap => {
+  const data = snap.val();
+  state.machines = data
+    ? MACHINE_NAMES.map(n => ({...initDefaultMachines()[0],...data[n],id:n}))
+    : initDefaultMachines();
+  render();
 });
 
-// =========================================================
-// EXPORTAR CSV e RESET
-// ==========================================================
+// =============================
+// EXPORTAR CSV
+// =============================
+function exportCSV() {
+  const lines = ['Maquina,Operador,Processo,Previsto,Realizado'];
+  state.machines.forEach(m=>{
+    lines.push(`${m.id},${m.operator},${m.process},${m.predicted||0},${m.produced||''}`);
+  });
+  const blob = new Blob([lines.join('\n')],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'usinagem.csv';
+  a.click();
+}
+
+// =============================
+// RESET
+// =============================
+function resetAll() {
+  if (!confirm('Resetar tudo?')) return;
+  state.machines.forEach(m=>REF.child(m.id).set(initDefaultMachines().find(x=>x.id===m.id)));
+}
+
+// =============================
+// BOTÕES HEADER
+// =============================
 document.addEventListener('DOMContentLoaded', () => {
-
-  const exportBtn = document.getElementById('exportAll');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', exportCSV);
-  }
-
-  const resetBtn = document.getElementById('resetAll');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', resetAll);
-  }
-
+  document.getElementById('exportAll').onclick = exportCSV;
+  document.getElementById('resetAll').onclick = resetAll;
 });
-
