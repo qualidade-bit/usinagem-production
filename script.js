@@ -7,6 +7,7 @@ const MACHINE_NAMES = [
  'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
  '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
 ];
+
 // =============================
 // FIREBASE NOVO
 // =============================
@@ -21,6 +22,7 @@ firebase.initializeApp({
 
 const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
+
 // ==========================================================
 // FUNÇÃO DE NOTIFICAÇÃO — SEM CRASE E SEM ERRO
 // ==========================================================
@@ -395,7 +397,7 @@ function render() {
      m.process = processInput.value.trim();
      m.cycleMin = (cycleInput.value.trim() === '') ? null : cycleVal;
      m.setupMin = setupVal || 0;
-     m.trocaMin = (cycleInput.value.trim() === '') ? null : trocaVal;
+     m.trocaMin = (trocaInput.value.trim() === '') ? null : trocaVal;
 
      m.observacao = observacaoInput.value;
      m.startTime = startVal;
@@ -594,4 +596,3 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
-
