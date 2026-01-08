@@ -7,18 +7,18 @@ const MACHINE_NAMES = [
  'Robodrill 1','VTC','D 800-2','D 800-3','Centur','Nardine','GL 280',
  '15S','E 280','G 240','Galaxy 10A','Galaxy 10B','GL 170G','GL 250','GL 350','GL 450'
 ];
+// =============================
+// FIREBASE NOVO
+// =============================
+firebase.initializeApp({
+  apiKey: "AIzaSyBtJ5bhKoYsG4Ht57yxJ-69fvvbVCVPGjI",
+  authDomain: "dashboardusinagem.firebaseapp.com",
+  projectId: "dashboardusinagem",
+  storageBucket: "dashboardusinagem.appspot.com",
+  messagingSenderId: "677023128312",
+  appId: "1:677023128312:web:75376363a62105f360f90d"
+});
 
-const firebaseConfig = {
- apiKey: "AIzaSyALyU3_v10EZzZMmN02RyXxpEficXRFtBY",
- authDomain: "usinagemdashboard.firebaseapp.com",
- databaseURL: "https://usinagemdashboard-default-rtdb.firebaseio.com",
- projectId: "usinagemdashboard",
- storageBucket: "usinagemdashboard.firebasestorage.app",
- messagingSenderId: "584772442861",
- appId: "1:5847720247ba0fe8468ae4"
-};
-
-firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
 // ==========================================================
@@ -594,3 +594,4 @@ function resetAll() {
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
