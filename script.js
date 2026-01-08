@@ -22,55 +22,6 @@ firebase.initializeApp({
 
 const db = firebase.database();
 const REF = db.ref('usinagem_dashboard_v18_6');
-
-// =============================
-// GOOGLE SHEETS
-// =============================
-const SHEET_ID = '1b-JLaNp19aiif3nzf_qiZHeGtQPd_LT-0wldRGUPHzE';
-const CLIENT_ID = '584894443570-srve3dj4h0b7cr5ndssgttn112tb2tv0.apps.googleusercontent.com';
-const RANGE = 'Controle de produção';
-
-function initGAPI() {
-  gapi.load('client:auth2', async () => {
-    await gapi.client.init({
-      discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
-      clientId: CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/spreadsheets"
-    });
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => initGAPI());
-
-async function sendHistoryToSheets(entry) {
-  try {
-    await gapi.auth2.getAuthInstance().signIn();
-
-    await gapi.client.sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: RANGE,
-      valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
-      resource: {
-        values: [[
-          new Date(entry.ts).toLocaleString(), // Data/Hora
-          entry.machineId || '-',              // Máquina
-          entry.operator || '-',               // Operador
-          entry.process || '-',                // Peça
-          entry.predicted || '',               // Previsto
-          entry.produced || '',                // Realizado
-          entry.efficiency || '',              // Eficiência
-          entry.observacao || ''               // Observação
-        ]]
-      }
-    });
-
-    console.log('Histórico enviado para Google Sheets!');
-  } catch (err) {
-    console.error('Erro ao enviar histórico:', err);
-  }
-}
-
 // =============================
 // FUNÇÕES DE TEMPO E CÁLCULO DE PRODUÇÃO
 // =============================
@@ -378,5 +329,6 @@ REF.once('value',snap=>{
   else{ state.machines=MACHINE_NAMES.map(name=>data[name]||{ id:name, history:[], future:[] }); }
   render();
 });
+
 
 
