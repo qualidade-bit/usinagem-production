@@ -1,3 +1,4 @@
+document.addEventListener('DOMContentLoaded', () => {
 // =============================
 //  CONFIGURAÇÕES INICIAIS E FIREBASE
 // =============================
@@ -595,4 +596,6 @@ function resetAll() {
 
 // Gatilhos
 document.getElementById('exportAll').addEventListener('click', exportCSV);
-document.getElementById('resetAll').addEventListener('click', resetAll);
+
+document.getElementById('resetAll').addEventListener('click', resetAll); 
+ });
