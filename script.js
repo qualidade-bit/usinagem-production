@@ -216,5 +216,17 @@ REF.on('value', snapshot => {
 // =========================================================
 // EXPORTAR CSV e RESET
 // ==========================================================
-document.getElementById('exportAll').addEventListener('click', exportCSV);
-document.getElementById('resetAll').addEventListener('click', resetAll);
+document.addEventListener('DOMContentLoaded', () => {
+
+  const exportBtn = document.getElementById('exportAll');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportCSV);
+  }
+
+  const resetBtn = document.getElementById('resetAll');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', resetAll);
+  }
+
+});
+
