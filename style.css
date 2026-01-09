@@ -43,3 +43,14 @@ button.sort-btn {
   padding: 6px 8px;
   font-size: 0.85rem;
 }
+canvas {
+  width: 100% !important;
+  height: 120px !important;
+}
+
+.machine-maintenance {
+  background-color: #facc15 !important;
+  color: #000 !important;
+}
+
+
