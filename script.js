@@ -597,3 +597,4 @@ function resetAll() {
 document.getElementById('exportAll').addEventListener('click', exportCSV);
 
 document.getElementById('resetAll').addEventListener('click', resetAll);
+
